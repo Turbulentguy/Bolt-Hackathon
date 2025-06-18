@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Search, FileText, Download, AlertCircle, CheckCircle, Loader2, RefreshCw, ExternalLink, Calendar, Users } from 'lucide-react';
+import {
+  LogOut, Search, FileText, Download,
+  AlertCircle, CheckCircle, Loader2,
+  RefreshCw, ExternalLink, Calendar, Users
+} from 'lucide-react';
 
 interface PaperResult {
   title: string;
@@ -19,50 +23,42 @@ export default function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<PaperResult[]>([]);
-  const [attempts, setAttempts] = useState(0);
-  const maxAttempts = 3;
 
-  const processQuery = async (searchQuery: string, attemptCount: number = 1): Promise<void> => {
+  const processQuery = async (searchQuery: string): Promise<void> => {
     setIsProcessing(true);
     setError('');
-    setAttempts(attemptCount);
+    setResults([]);
 
     try {
-      const response = await fetch('/api/process-paper', {
-        method: 'POST',
+      const url = `https://nested-buttons-integer-allowed.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          maxResults: 1
-        }),
+          'accept': 'application/json'
+        }
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to process paper');
+        const errorData = await response.text();
+        throw new Error(errorData || 'Failed to fetch paper');
       }
 
       const data = await response.json();
-      
-      if (data.success && data.data.length > 0) {
-        setResults(data.data);
-      } else {
-        throw new Error('No papers found for the given query');
-      }
 
+      const paper: PaperResult = {
+        title: data.title || 'No title',
+        authors: data.authors?.split(',').map((a: string) => a.trim()) || [],
+        abstract: data.summary || 'No abstract',
+        pdfUrl: data.pdf_link || '',
+        arxivUrl: data.pdf_link.replace('/pdf/', '/abs/'),
+        publishedDate: data.published || '',
+        fullText: data.summary || '',
+        summary: data.summary || ''
+      };
+
+      setResults([paper]);
     } catch (err: any) {
-      console.error('Processing error:', err);
-      
-      if (attemptCount < maxAttempts) {
-        // Retry after delay
-        setTimeout(() => {
-          processQuery(searchQuery, attemptCount + 1);
-        }, 2000);
-      } else {
-        setError(`Failed to process query after ${maxAttempts} attempts: ${err.message}`);
-      }
+      setError(err.message || 'Something went wrong');
     } finally {
       setIsProcessing(false);
     }
@@ -74,8 +70,6 @@ export default function Dashboard() {
       setError('Please enter a search query');
       return;
     }
-    
-    setResults([]);
     processQuery(query.trim());
   };
 
@@ -115,7 +109,7 @@ export default function Dashboard() {
               </div>
               <h1 className="text-xl font-bold text-gray-800">AI Paper Summarizer</h1>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <span className="text-gray-600">Welcome, {user?.firstName}!</span>
               <button
@@ -139,8 +133,7 @@ export default function Dashboard() {
               Discover & Summarize Research Papers
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Search ArXiv for academic papers and get AI-powered summaries using GPT-4o-mini. 
-              Enter keywords, topics, or author names to find relevant research.
+              Search ArXiv for academic papers and get AI-powered summaries. Enter keywords, topics, or author names.
             </p>
           </div>
         </div>
@@ -160,7 +153,7 @@ export default function Dashboard() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
-                    placeholder="e.g., machine learning, neural networks, quantum computing..."
+                    placeholder="e.g., medical image segmentation"
                     disabled={isProcessing}
                   />
                 </div>
@@ -184,15 +177,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Processing Status */}
-            {isProcessing && attempts > 1 && (
-              <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <RefreshCw className="w-5 h-5" />
-                <span>Retry attempt {attempts} of {maxAttempts}...</span>
-              </div>
-            )}
-
-            {/* Error Display */}
             {error && (
               <div className="flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
                 <AlertCircle className="w-5 h-5" />
@@ -207,7 +191,7 @@ export default function Dashboard() {
           <div className="space-y-8">
             <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
               <CheckCircle className="w-5 h-5" />
-              <span>Paper processed successfully! Summary generated using GPT-4o-mini.</span>
+              <span>Paper processed successfully! Summary available below.</span>
             </div>
 
             {results.map((paper, index) => (
@@ -219,7 +203,7 @@ export default function Dashboard() {
                   </div>
                   <div className="p-6">
                     <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
-                    
+
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div className="flex items-center space-x-2 text-gray-600">
                         <Users className="w-4 h-4" />
@@ -263,32 +247,11 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Original Content */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-white">Full Paper Content</h3>
-                      <button
-                        onClick={() => handleSave(paper.fullText, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_full`)}
-                        className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Save</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="max-h-96 overflow-y-auto">
-                      <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.fullText}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* AI Summary */}
+                {/* Summary Section */}
                 <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
                   <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-white">AI Summary (GPT-4o-mini)</h3>
+                      <h3 className="text-lg font-semibold text-white">AI Summary</h3>
                       <button
                         onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
                         className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
@@ -299,7 +262,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="p-6">
-                    <p className="text-gray-600 leading-relaxed">{paper.summary}</p>
+                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.summary}</p>
                   </div>
                 </div>
               </div>
