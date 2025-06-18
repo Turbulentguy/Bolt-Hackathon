@@ -1,0 +1,312 @@
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { LogOut, Search, FileText, Download, AlertCircle, CheckCircle, Loader2, RefreshCw, ExternalLink, Calendar, Users } from 'lucide-react';
+
+interface PaperResult {
+  title: string;
+  authors: string[];
+  abstract: string;
+  pdfUrl: string;
+  arxivUrl: string;
+  publishedDate: string;
+  fullText: string;
+  summary: string;
+}
+
+export default function Dashboard() {
+  const { user, logout } = useAuth();
+  const [query, setQuery] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState('');
+  const [results, setResults] = useState<PaperResult[]>([]);
+  const [attempts, setAttempts] = useState(0);
+  const maxAttempts = 3;
+
+  const processQuery = async (searchQuery: string, attemptCount: number = 1): Promise<void> => {
+    setIsProcessing(true);
+    setError('');
+    setAttempts(attemptCount);
+
+    try {
+      const response = await fetch('/api/process-paper', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          maxResults: 1
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to process paper');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data.length > 0) {
+        setResults(data.data);
+      } else {
+        throw new Error('No papers found for the given query');
+      }
+
+    } catch (err: any) {
+      console.error('Processing error:', err);
+      
+      if (attemptCount < maxAttempts) {
+        // Retry after delay
+        setTimeout(() => {
+          processQuery(searchQuery, attemptCount + 1);
+        }, 2000);
+      } else {
+        setError(`Failed to process query after ${maxAttempts} attempts: ${err.message}`);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) {
+      setError('Please enter a search query');
+      return;
+    }
+    
+    setResults([]);
+    processQuery(query.trim());
+  };
+
+  const handleSave = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Header */}
+      <header className="bg-white/70 backdrop-blur-sm border-b border-white/20 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-gray-800">AI Paper Summarizer</h1>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-600">Welcome, {user?.firstName}!</span>
+              <button
+                onClick={logout}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-8 border border-white/20">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">
+              Discover & Summarize Research Papers
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Search ArXiv for academic papers and get AI-powered summaries using GPT-4o-mini. 
+              Enter keywords, topics, or author names to find relevant research.
+            </p>
+          </div>
+        </div>
+
+        {/* Search Section */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-8 border border-white/20">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-2">
+                Search Query
+              </label>
+              <div className="flex space-x-4">
+                <div className="flex-1 relative">
+                  <input
+                    id="query"
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                    placeholder="e.g., machine learning, neural networks, quantum computing..."
+                    disabled={isProcessing}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isProcessing || !query.trim()}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="animate-spin w-5 h-5" />
+                      <span>Searching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-5 h-5" />
+                      <span>Search</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Processing Status */}
+            {isProcessing && attempts > 1 && (
+              <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <RefreshCw className="w-5 h-5" />
+                <span>Retry attempt {attempts} of {maxAttempts}...</span>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
+                <AlertCircle className="w-5 h-5" />
+                <span>{error}</span>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Results Section */}
+        {results.length > 0 && (
+          <div className="space-y-8">
+            <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
+              <CheckCircle className="w-5 h-5" />
+              <span>Paper processed successfully! Summary generated using GPT-4o-mini.</span>
+            </div>
+
+            {results.map((paper, index) => (
+              <div key={index} className="space-y-6">
+                {/* Paper Info */}
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                  <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4">
+                    <h3 className="text-lg font-semibold text-white">Paper Information</h3>
+                  </div>
+                  <div className="p-6">
+                    <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
+                    
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div className="flex items-center space-x-2 text-gray-600">
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm">
+                          <strong>Authors:</strong> {paper.authors.join(', ') || 'Not available'}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-gray-600">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-sm">
+                          <strong>Published:</strong> {formatDate(paper.publishedDate)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h5 className="font-semibold text-gray-800 mb-2">Abstract:</h5>
+                      <p className="text-gray-600 leading-relaxed">{paper.abstract}</p>
+                    </div>
+
+                    <div className="flex space-x-4">
+                      <a
+                        href={paper.arxivUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors duration-200"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>View on ArXiv</span>
+                      </a>
+                      <a
+                        href={paper.pdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 text-purple-600 hover:text-purple-700 transition-colors duration-200"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>Download PDF</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Original Content */}
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-white">Full Paper Content</h3>
+                      <button
+                        onClick={() => handleSave(paper.fullText, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_full`)}
+                        className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Save</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="max-h-96 overflow-y-auto">
+                      <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.fullText}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Summary */}
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-white">AI Summary (GPT-4o-mini)</h3>
+                      <button
+                        onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
+                        className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Save</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <p className="text-gray-600 leading-relaxed">{paper.summary}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
