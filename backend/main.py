@@ -5,7 +5,13 @@ from supabase import create_client
 from supabase_config import SUPABASE_URL, SUPABASE_KEY
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # หรือเช่น ["http://localhost:3000"] ใน dev
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Initialize Supabase client
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
