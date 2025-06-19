@@ -1,34 +1,36 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { LogIn, Mail, Lock, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+// src/components/Login.tsx
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { LogIn, Mail, Lock, Loader2 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const { login } = useAuth()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
 
     try {
-      const success = await login(email, password);
+      console.log('Attempting to log in with:', { email, password })
+      const success = await login(email, password)
       if (success) {
-        navigate('/dashboard');
+        navigate('/dashboard')
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError('Invalid credentials. Please try again.')
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError('An error occurred. Please try again.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -104,16 +106,16 @@ export default function Login() {
           <div className="mt-6 text-center">
             <p className="text-gray-600">
               Don't have an account?{' '}
-              <Link 
-                to="/register" 
+              <a
+                href="/register"
                 className="text-blue-600 hover:text-blue-700 font-semibold transition-colors duration-200"
               >
                 Sign up here
-              </Link>
+              </a>
             </p>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }

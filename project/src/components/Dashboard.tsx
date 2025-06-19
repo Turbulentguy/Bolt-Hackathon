@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LogOut, Search, FileText, Download,
   AlertCircle, CheckCircle, Loader2,
-  RefreshCw, ExternalLink, Calendar, Users
+  ExternalLink, Calendar, Users
 } from 'lucide-react';
 
 interface PaperResult {
@@ -30,7 +30,7 @@ export default function Dashboard() {
     setResults([]);
 
     try {
-      const url = `https://nested-buttons-integer-allowed.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
+      const url = ` https://daughters-fire-rebates-cited.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -111,7 +111,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">Welcome, {user?.firstName}!</span>
+              <span className="text-gray-600">Welcome, {user?.email}!</span>
               <button
                 onClick={logout}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"

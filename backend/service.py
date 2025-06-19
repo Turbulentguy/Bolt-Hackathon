@@ -81,10 +81,10 @@ def summarize_text_with_gpt(text):
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": (
-                "คุณคือผู้ช่วยด้านวิชาการสำหรับนักพัฒนา "
-                "มีหน้าที่สรุปงานวิจัยอย่างแม่นยำและครบถ้วนจากเนื้อหาที่ให้มา โดยไม่ใส่ความคิดเห็นหรือข้อมูลอื่นเพิ่มเติม"
+                "You are a helpful assistant specialized in summarizing research papers. "
+                "Your task is to provide a concise summary of the provided text, "
             )},
-            {"role": "user", "content": f"""กรุณาสรุปงานวิจัยดังต่อไปนี้:\n\n{text}"""}
+            {"role": "user", "content": f"""Please summarize this research:\n\n{text}"""}
         ],
         max_tokens=2800,
         temperature=0.4
@@ -140,4 +140,4 @@ def fetch_and_summarize(query: str):
             "summary": summary
         }
 
-    return {"error": "ไม่พบงานวิจัยที่สามารถดาวน์โหลดหรือสรุปได้"}
+    return {"error": "Can't find any papers matching your query."}
