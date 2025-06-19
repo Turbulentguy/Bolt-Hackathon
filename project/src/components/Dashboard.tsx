@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../supabase';
+import SearchHistory from './SearchHistory';
 import {
   LogOut, Search, FileText, Download,
   AlertCircle, CheckCircle, Loader2,
-  ExternalLink, Calendar, Users
+  ExternalLink, Calendar, Users, History
 } from 'lucide-react';
 
 interface PaperResult {
@@ -23,6 +25,26 @@ export default function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<PaperResult[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const saveToHistory = async (searchQuery: string, paper: PaperResult) => {
+    if (!user) return;
+
+    try {
+      await supabase.from('search_history').insert({
+        user_id: user.id,
+        query: searchQuery,
+        paper_title: paper.title,
+        paper_authors: paper.authors.join(', '),
+        paper_summary: paper.summary,
+        paper_pdf_url: paper.pdfUrl,
+        paper_arxiv_url: paper.arxivUrl,
+        paper_published_date: paper.publishedDate
+      });
+    } catch (err) {
+      console.error('Failed to save to history:', err);
+    }
+  };
 
   const processQuery = async (searchQuery: string): Promise<void> => {
     setIsProcessing(true);
@@ -30,7 +52,7 @@ export default function Dashboard() {
     setResults([]);
 
     try {
-      const url = ` https://daughters-fire-rebates-cited.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
+      const url = `https://daughters-fire-rebates-cited.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -57,6 +79,9 @@ export default function Dashboard() {
       };
 
       setResults([paper]);
+      
+      // Save to history
+      await saveToHistory(searchQuery, paper);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -97,6 +122,10 @@ export default function Dashboard() {
     }
   };
 
+  if (showHistory) {
+    return <SearchHistory onBack={() => setShowHistory(false)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -112,6 +141,13 @@ export default function Dashboard() {
 
             <div className="flex items-center space-x-4">
               <span className="text-gray-600">Welcome, {user?.email}!</span>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+              >
+                <History className="w-5 h-5" />
+                <span>History</span>
+              </button>
               <button
                 onClick={logout}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
