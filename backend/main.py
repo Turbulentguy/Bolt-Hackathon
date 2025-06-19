@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from service import fetch_and_summarize
 from supabase import create_client
 from supabase_config import SUPABASE_URL, SUPABASE_KEY
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
