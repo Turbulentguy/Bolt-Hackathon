@@ -9,6 +9,7 @@ dist-ssr/
 .env
 *.local
 backend/venv/
+backend/.env
 **/venv/
 **/.env
 venv/
