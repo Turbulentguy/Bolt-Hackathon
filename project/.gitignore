@@ -10,6 +10,7 @@ dist-ssr/
 *.local
 backend/venv/
 **/venv/
+**/.env
 venv/
 # npm / yarn / pnpm logs
 logs/
