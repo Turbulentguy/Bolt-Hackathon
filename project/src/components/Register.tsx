@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, User, Mail, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -14,7 +13,7 @@ export default function Register() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { register } = useAuth();
+  const { register } = useAuth(); 
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,15 +41,17 @@ export default function Register() {
     }
 
     try {
-      const {error } = await supabase.auth.signUp({
-      email: formData.email.trim(),
-      password: formData.password,
-    });
+      const success = await register({
+        email: formData.email.trim(),
+        password: formData.password,
+        firstName: formData.firstName,
+        surname: formData.surname
+      });
 
-      if (error) {
+      if (!success) {
         setError('Registration failed. This email may already be in use or is invalid.');
       } else {
-          navigate('/dashboard');
+        navigate('/dashboard');
       }
     } catch (err: any) {
       setError(err?.message || 'An error occurred. Please try again.');

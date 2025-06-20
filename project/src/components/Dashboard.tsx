@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import {
   LogOut, Search, FileText, Download,
   AlertCircle, CheckCircle, Loader2,
   ExternalLink, Calendar, Users
 } from 'lucide-react';
+import DiscordCanary from '../assets/Discord_Canary.png';
 
 interface PaperResult {
   title: string;
@@ -30,7 +32,7 @@ export default function Dashboard() {
     setResults([]);
 
     try {
-      const url = ` https://daughters-fire-rebates-cited.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
+      const url = ` https://equally-lowest-wearing-muscles.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -99,17 +101,15 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <header className="bg-white/70 backdrop-blur-sm border-b border-white/20 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 via-orange-400 to-purple-500 rounded-2xl flex items-center justify-center shadow-md border-2 border-white">
+                <img src={DiscordCanary} alt="Discord Canary Logo" className="w-8 h-8 drop-shadow-lg" />
               </div>
-              <h1 className="text-xl font-bold text-gray-800">AI Paper Summarizer</h1>
+              <h1 className="text-2xl font-extrabold text-gray-800 tracking-wide ml-2" style={{letterSpacing: '0.04em'}}>BOTCHANA</h1>
             </div>
-
             <div className="flex items-center space-x-4">
               <span className="text-gray-600">Welcome, {user?.email}!</span>
               <button
@@ -124,9 +124,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-8 border border-white/20">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-800 mb-4">
@@ -138,14 +136,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Search Section */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-8 border border-white/20">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-2">
                 Search Query
-              </label>
-              <div className="flex space-x-4">
+              </label>              <div className="flex space-x-4">
+                <Link to="/history">
+                  <button
+                    type="button"
+                    className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-semibold rounded-xl hover:from-yellow-600 hover:to-orange-700 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    <FileText className="w-5 h-5" />
+                    <span>History</span>
+                  </button>
+                </Link>
                 <div className="flex-1 relative">
                   <input
                     id="query"
@@ -158,25 +163,24 @@ export default function Dashboard() {
                   />
                 </div>
                 <button
-                  type="submit"
-                  disabled={isProcessing || !query.trim()}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="animate-spin w-5 h-5" />
-                      <span>Searching...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-5 h-5" />
-                      <span>Search</span>
-                    </>
-                  )}
-                </button>
+                type="submit"
+                disabled={isProcessing || !query.trim()}
+                className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-semibold rounded-xl hover:from-yellow-600 hover:to-orange-700 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="animate-spin w-5 h-5" />
+                    <span>Searching...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-5 h-5" />
+                    <span>Search</span>
+                  </>
+                )}
+              </button>
               </div>
             </div>
-
             {error && (
               <div className="flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
                 <AlertCircle className="w-5 h-5" />
@@ -186,7 +190,6 @@ export default function Dashboard() {
           </form>
         </div>
 
-        {/* Results Section */}
         {results.length > 0 && (
           <div className="space-y-8">
             <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
@@ -196,14 +199,12 @@ export default function Dashboard() {
 
             {results.map((paper, index) => (
               <div key={index} className="space-y-6">
-                {/* Paper Info */}
                 <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
                   <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4">
                     <h3 className="text-lg font-semibold text-white">Paper Information</h3>
                   </div>
                   <div className="p-6">
                     <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
-
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div className="flex items-center space-x-2 text-gray-600">
                         <Users className="w-4 h-4" />
@@ -218,12 +219,10 @@ export default function Dashboard() {
                         </span>
                       </div>
                     </div>
-
                     <div className="mb-4">
                       <h5 className="font-semibold text-gray-800 mb-2">Abstract:</h5>
                       <p className="text-gray-600 leading-relaxed">{paper.abstract}</p>
                     </div>
-
                     <div className="flex space-x-4">
                       <a
                         href={paper.arxivUrl}
@@ -247,7 +246,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Summary Section */}
                 <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
                   <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4">
                     <div className="flex items-center justify-between">
