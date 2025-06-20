@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, User, Mail, Lock, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext'
+import DiscordCanary from '../assets/Discord_Canary.png';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -65,11 +66,11 @@ export default function Register() {
       <div className="w-full max-w-md">
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/20">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full mb-4">
-              <UserPlus className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-orange-500 to-yellow-600 rounded-full mb-4">
+              <img src={DiscordCanary} alt="Discord Canary Logo" className="w-12 h-12" />
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">Create Account</h1>
-            <p className="text-gray-600">Join AI Paper Summarizer today</p>
+            <p className="text-gray-600">Join BOTCHANA today</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -179,7 +180,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-purple-600 hover:to-pink-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="w-full bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-orange-600 hover:to-yellow-700 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isLoading ? (
                 <>
@@ -197,7 +198,7 @@ export default function Register() {
               Already have an account?{' '}
               <Link 
                 to="/login" 
-                className="text-purple-600 hover:text-purple-700 font-semibold transition-colors duration-200"
+                className="text-orange-600 hover:text-orange-700 font-semibold transition-colors duration-200"
               >
                 Sign in here
               </Link>

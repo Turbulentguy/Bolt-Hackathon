@@ -121,13 +121,13 @@ export function History() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-lg">              <thead className="bg-gray-100">
-                <tr>
+            <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-lg">              <thead className="bg-gray-100">                <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Title</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Authors</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Published</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Added</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Actions</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">Summary</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -177,11 +177,14 @@ export function History() {
                               navigator.clipboard.writeText(paper.bibtex);
                               alert('BibTeX copied to clipboard!');
                             }}
-                          >
-                            <Clipboard className="w-4 h-4" />                          <span>Copy BibTeX</span>
-                        </button>
+                          >                            <Clipboard className="w-4 h-4" />
+                            <span>Copy BibTeX</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-right">
                         <button
-                          className={`flex items-center gap-1 ${expandedRows[paper.id] ? 'text-orange-600 hover:text-orange-800' : 'text-purple-600 hover:text-purple-800'}`}
+                          className={`flex items-center gap-1 ml-auto ${expandedRows[paper.id] ? 'text-orange-600 hover:text-orange-800' : 'text-purple-600 hover:text-purple-800'}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleSummary(paper.id);
@@ -189,11 +192,10 @@ export function History() {
                         >
                           <span>{expandedRows[paper.id] ? 'Hide Summary' : 'View Summary'}</span>
                         </button>
-                      </div>
-                    </td>
-                    </tr>                    {expandedRows[paper.id] && (
+                      </td>
+                    </tr>{expandedRows[paper.id] && (
                       <tr className="bg-gray-50">
-                        <td colSpan={5} className="px-6 py-4 border-t border-b border-gray-200">
+                        <td colSpan={6} className="px-6 py-4 border-t border-b border-gray-200">
                           <div className="text-sm text-gray-700">
                             <p className="font-medium text-gray-800 mb-2">Summary:</p>
                             <p className="text-gray-600 leading-relaxed bg-white p-4 rounded-md shadow-sm border border-gray-100">
