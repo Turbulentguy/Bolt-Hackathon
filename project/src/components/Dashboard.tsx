@@ -485,7 +485,7 @@ export default function Dashboard() {
                       onChange={handleFileSelect}
                     />
                   </label>
-                  <p className="text-xs text-gray-400 mt-2">Accepted formats: PDF, TXT, DOC, DOCX</p>
+                  <p className="text-xs text-gray-400 mt-2">Accepted formats: PDF</p>
                 </div>
               </div>
             </div>
