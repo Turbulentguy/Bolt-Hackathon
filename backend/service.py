@@ -412,5 +412,67 @@ def fetch_and_summarize(query: str):
         print(f"[ERROR] Unexpected exception in fetch_and_summarize: {e}")
         return {"error": f"Internal server error: {str(e)}"}
 
+def process_uploaded_pdf(file_content, filename):
+    """Process an uploaded PDF file and generate a summary using GPT-4o-mini."""
+    try:
+        print(f"[INFO] Processing uploaded file: {filename}")
+        
+        # Validate PDF data
+        if len(file_content) < 1000:  # PDF should be at least 1KB
+            print("[ERROR] PDF data too small, likely not a valid PDF")
+            return {"error": "Invalid PDF file (too small)"}
+            
+        if not file_content.startswith(b'%PDF'):
+            print("[ERROR] Invalid PDF header")
+            return {"error": "Invalid PDF file format"}
+            
+        try:
+            pdf_file = io.BytesIO(file_content)
+            reader = PdfReader(pdf_file)
+            
+            # Check if PDF has pages
+            if len(reader.pages) == 0:
+                print("[ERROR] PDF has no pages")
+                return {"error": "PDF has no pages"}
+
+            text = ""
+            for page_num, page in enumerate(reader.pages):
+                try:
+                    page_text = page.extract_text()
+                    if page_text and page_text.strip():
+                        text += page_text + "\n"
+                except Exception as page_error:
+                    print(f"[WARNING] Failed to extract text from page {page_num}: {page_error}")
+                    continue
+            
+            # Validate extracted text
+            if not text.strip():
+                print("[ERROR] No text could be extracted from PDF")
+                return {"error": "No text could be extracted from PDF"}
+                
+            if len(text.strip()) < 100:  # Ensure we have substantial content
+                print("[WARNING] Very little text extracted, might be image-based PDF")
+                return {"error": "Very little text could be extracted. The PDF might be image-based."}
+                
+            # Generate summary
+            summary = summarize_text_with_gpt(text)
+            
+            # Create response
+            result = {
+                "filename": filename,
+                "title": filename.replace('.pdf', ''),  # Basic title from filename
+                "summary": summary
+            }
+            
+            return result
+            
+        except Exception as pdf_error:
+            print(f"[ERROR] PDF processing failed: {pdf_error}")
+            return {"error": f"PDF processing failed: {str(pdf_error)}"}
+            
+    except Exception as e:
+        print(f"[ERROR] Unexpected exception in process_uploaded_pdf: {e}")
+        return {"error": f"Internal server error: {str(e)}"}
+
 
 

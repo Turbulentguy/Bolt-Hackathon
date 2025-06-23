@@ -20,6 +20,12 @@ interface PaperResult {
   summary: string;
 }
 
+interface FileUploadResponse {
+  filename: string;
+  title: string;
+  summary: string;
+}
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [query, setQuery] = useState('');
@@ -27,6 +33,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [results, setResults] = useState<PaperResult[]>([]);
   const [allPapers, setAllPapers] = useState<PaperResult[]>([]);
+  const [uploadedResults, setUploadedResults] = useState<PaperResult[]>([]); // สำหรับเก็บผลลัพธ์จากการอัปโหลด
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
@@ -109,8 +116,7 @@ export default function Dashboard() {
     setError('');
     setResults([]);
 
-    try {
-      const url = ` https://equally-lowest-wearing-muscles.trycloudflare.com/summarize?query=${encodeURIComponent(searchQuery)}`;
+    try {      const url = `http://127.0.0.1:8000/summarize?query=${encodeURIComponent(searchQuery)}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -208,22 +214,84 @@ export default function Dashboard() {
   const removeFile = useCallback((indexToRemove: number) => {
     setUploadedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   }, []);
-
-  const handleUpload = useCallback(() => {
-    // In a real implementation, you would send these files to your backend
-    console.log('Files to upload:', uploadedFiles);
+  const handleUpload = useCallback(async () => {
+    if (uploadedFiles.length === 0) return;
     
-    // Simulating upload success for now
-    setTimeout(() => {
-      setUploadSuccess(`Successfully uploaded ${uploadedFiles.length} file(s)`);
+    // Set processing state to show loading
+    setIsProcessing(true);
+    setError('');
+      try {
+      // รีเซ็ตผลลัพธ์เก่า
+      setUploadedResults([]);
+      
+      // Process each file one by one
+      for (const file of uploadedFiles) {
+        // Skip non-PDF files
+        if (!file.name.endsWith('.pdf')) {
+          console.warn(`Skipping non-PDF file: ${file.name}`);
+          continue;
+        }
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('file', file);
+          // Upload to backend
+        const response = await fetch('http://127.0.0.1:8000/upload-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+          if (!response.ok) {
+          const errorData = await response.text();
+          console.error(`Upload error (${response.status}):`, errorData);
+          throw new Error(`Failed to upload file ${file.name}: ${response.status} ${response.statusText}`);
+        }
+          // Process the response
+        let data: FileUploadResponse;
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          console.error('JSON parsing error:', jsonError);
+          throw new Error(`Failed to parse response for file ${file.name}. Server response was not valid JSON.`);
+        }
+          // Add to uploaded results
+        const paper: PaperResult = {
+          title: data.title || file.name,
+          authors: ['Uploaded by you'],
+          abstract: data.summary || 'No summary available',
+          pdfUrl: '#', // No direct URL for uploaded files
+          arxivUrl: '#',
+          publishedDate: new Date().toISOString(),
+          fullText: data.summary || 'No content available',
+          summary: data.summary || 'No summary available'
+        };
+          // Add to uploaded results at the end (new items at the bottom)
+        setUploadedResults(prev => [...prev, paper]);
+        
+        setUploadSuccess(`Successfully processed file: ${file.name}`);
+      }
+      
       // Clear the files list after successful upload
       setUploadedFiles([]);
       
       // Clear success message after 5 seconds
       setTimeout(() => {
         setUploadSuccess(null);
-      }, 5000);
-    }, 1500);
+      }, 5000);    } catch (err: any) {
+      console.error('Upload error:', err);
+      
+      // Provide more helpful error messages for common issues
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('Cannot connect to server. Please check if the backend server is running at http://127.0.0.1:8000');
+      } else if (err.message?.includes('404')) {
+        setError('Server endpoint not found. Please check if the backend server is running with the correct API endpoints.');
+      } else {
+        setError(err.message || 'Error uploading files');
+      }
+      
+      setUploadSuccess(null);
+    } finally {
+      setIsProcessing(false);
+    }
   }, [uploadedFiles]);
 
   // Function to get file size display
@@ -455,6 +523,13 @@ export default function Dashboard() {
             </div>
           )}
           
+          {error && (
+            <div className="mb-6 flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3 animate-fadeIn">
+              <AlertCircle className="w-5 h-5" />
+              <span>{error}</span>
+            </div>
+          )}
+          
           <div className="space-y-6">
             {/* Dropzone */}
             <div 
@@ -475,17 +550,16 @@ export default function Dashboard() {
                   <h4 className="font-semibold text-lg text-gray-700">Drag and drop your PDF files here</h4>
                   <p className="text-gray-500 text-sm">or</p>
                   <label className="inline-block px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium rounded-xl hover:shadow-glow cursor-pointer transition-all duration-200">
-                    Browse Files
-                    <input 
+                    Browse Files                    <input 
                       ref={fileInputRef}
                       type="file" 
-                      accept=".pdf,.txt,.doc,.docx" 
+                      accept=".pdf" 
                       multiple 
                       className="hidden" 
                       onChange={handleFileSelect}
                     />
                   </label>
-                  <p className="text-xs text-gray-400 mt-2">Accepted formats: PDF</p>
+                  <p className="text-xs text-gray-400 mt-2">Accepted formats: PDF only</p>
                 </div>
               </div>
             </div>
@@ -529,13 +603,22 @@ export default function Dashboard() {
                     ))}
                   </div>
                 </div>
-                <div className="flex justify-end">
-                  <button
+                <div className="flex justify-end">                  <button
                     onClick={handleUpload}
-                    className="px-6 py-2.5 bg-gradient-to-r from-accent-500 to-accent-600 text-white font-semibold rounded-xl hover:shadow-purple-glow focus:ring-2 focus:ring-accent-400 focus:ring-offset-2 transition-all duration-300 flex items-center space-x-2"
+                    disabled={isProcessing || uploadedFiles.length === 0}
+                    className="px-6 py-2.5 bg-gradient-to-r from-accent-500 to-accent-600 text-white font-semibold rounded-xl hover:shadow-purple-glow focus:ring-2 focus:ring-accent-400 focus:ring-offset-2 transition-all duration-300 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Upload className="w-4 h-4" />
-                    <span>Upload Files</span>
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Files</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -579,6 +662,73 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* Uploaded Papers Results Section */}
+        {uploadedResults.length > 0 && (
+          <div className="relative bg-gradient-to-tr from-purple-50/90 to-blue-50/80 rounded-3xl shadow-card p-8 mb-8 border border-white/40 overflow-hidden">
+            <div className="absolute inset-0 bg-white/40 backdrop-blur-sm -z-10"></div>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 via-blue-400 to-primary-400"></div>
+            
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl mr-3">
+                  <FileText className="w-6 h-6 text-accent-600" />
+                </div>
+                <h3 className="text-2xl font-display font-bold text-gray-800">Uploaded Paper Summaries</h3>
+              </div>
+              
+              <div className="flex items-center">
+                <span className="text-sm text-gray-500 mr-2">Found {uploadedResults.length} summaries</span>
+              </div>
+            </div>
+              <div className="space-y-8">
+              {[...uploadedResults].reverse().map((paper, index) => (
+                <div key={index} className="space-y-6">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                    <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4">
+                      <h3 className="text-lg font-semibold text-white">Paper Information</h3>
+                    </div>
+                    <div className="p-6">
+                      <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <div className="flex items-center space-x-2 text-gray-600">
+                          <Users className="w-4 h-4" />
+                          <span className="text-sm">
+                            <strong>Source:</strong> Uploaded by you
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-gray-600">
+                          <Calendar className="w-4 h-4" />
+                          <span className="text-sm">
+                            <strong>Uploaded:</strong> {formatDate(paper.publishedDate)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                    <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-white">AI Summary</h3>
+                        <button
+                          onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
+                          className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Save</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.summary}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* All Papers Section - Always visible */}
         <div className="relative bg-gradient-to-br from-secondary-50/90 to-accent-50/80 rounded-3xl shadow-card p-8 mb-8 border border-white/40 overflow-hidden">
