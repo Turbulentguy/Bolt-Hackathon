@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
+import { supabase } from '../supabase';
 import {
   LogOut, Search, FileText, Download,
   AlertCircle, CheckCircle, Loader2,
   ExternalLink, Calendar, Users,
-  Upload, File, X, Check, Eye
+  Upload, File, X, Check, Eye, History as HistoryIcon
 } from 'lucide-react';
 import DiscordCanary from '../assets/Discord_Canary.png';
 
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showUploadSection, setShowUploadSection] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Load all papers on component mount
@@ -110,7 +112,6 @@ export default function Dashboard() {
     
     setAllPapers(allPapers);
   }, []);
-
   const processQuery = async (searchQuery: string): Promise<void> => {
     setIsProcessing(true);
     setError('');
@@ -143,6 +144,28 @@ export default function Dashboard() {
       };
 
       setResults([paper]);
+
+      // Save to Supabase for history
+      try {
+        const { error } = await supabase
+          .from('papers')
+          .insert([{
+            title: data.title || 'No title',
+            authors: data.authors || 'Unknown authors',
+            published: data.published || new Date().toISOString(),
+            pdf_link: data.pdf_link || '',
+            bibtex: '',
+            summary: data.summary || 'No summary available',
+            created_at: new Date().toISOString()
+          }]);
+          
+        if (error) {
+          console.error('Error saving search to history:', error);
+        }
+      } catch (supabaseError) {
+        console.error('Error saving search to Supabase:', supabaseError);
+        // Don't throw the error, continue even if saving to history fails
+      }
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -213,8 +236,7 @@ export default function Dashboard() {
 
   const removeFile = useCallback((indexToRemove: number) => {
     setUploadedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
-  }, []);
-  const handleUpload = useCallback(async () => {
+  }, []);  const handleUpload = useCallback(async () => {
     if (uploadedFiles.length === 0) return;
     
     // Set processing state to show loading
@@ -267,11 +289,34 @@ export default function Dashboard() {
           // Add to uploaded results at the end (new items at the bottom)
         setUploadedResults(prev => [...prev, paper]);
         
-        setUploadSuccess(`Successfully processed file: ${file.name}`);
+        // Save to Supabase for history
+        try {
+          const { error } = await supabase
+            .from('papers')
+            .insert([{
+              title: data.title || file.name,
+              authors: 'Uploaded by you',
+              published: new Date().toISOString(),
+              pdf_link: '#', // No direct URL for uploaded files
+              bibtex: '',
+              summary: data.summary || 'No summary available',
+              created_at: new Date().toISOString()
+            }]);
+            
+          if (error) {
+            console.error('Error saving to history:', error);
+          }
+        } catch (supabaseError) {
+          console.error('Error saving to Supabase:', supabaseError);
+          // Don't throw the error here, we want to continue even if saving to history fails
+        }
+          setUploadSuccess(`Successfully processed file: ${file.name} and saved to history`);
       }
-      
-      // Clear the files list after successful upload
+        // Clear the files list after successful upload
       setUploadedFiles([]);
+      
+      // Hide the upload section after successful upload
+      setShowUploadSection(false);
       
       // Clear success message after 5 seconds
       setTimeout(() => {
@@ -292,7 +337,7 @@ export default function Dashboard() {
     } finally {
       setIsProcessing(false);
     }
-  }, [uploadedFiles]);
+  }, [uploadedFiles, setShowUploadSection]);
 
   // Function to get file size display
   const formatFileSize = (size: number): string => {
@@ -375,8 +420,18 @@ export default function Dashboard() {
             <div>
               <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-3 ml-1">
                 Search Query
-              </label>
-              <div className="flex flex-col sm:flex-row gap-4">
+              </label>              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadSection(!showUploadSection)}
+                  className="w-12 h-12 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:shadow-blue-glow focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center group"
+                  title={showUploadSection ? "Close Upload" : "Upload New Paper"}
+                >
+                  <svg className={`w-5 h-5 transition-transform duration-300 ${showUploadSection ? 'rotate-45' : 'group-hover:rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+                
                 <Link to="/history" className="sm:order-last">
                   <button
                     type="button"
@@ -399,8 +454,7 @@ export default function Dashboard() {
                     placeholder="e.g., medical image segmentation"
                     disabled={isProcessing}
                   />
-                </div>
-                <button
+                </div>                <button
                   type="submit"
                   disabled={isProcessing || !query.trim()}
                   className="px-8 py-3 bg-gradient-to-r from-accent-500 to-accent-600 text-white font-semibold rounded-xl hover:shadow-purple-glow focus:ring-2 focus:ring-accent-400 focus:ring-offset-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
@@ -415,8 +469,7 @@ export default function Dashboard() {
                       <Search className="w-5 h-5" />
                       <span>Search</span>
                     </>
-                  )}
-                </button>
+                  )}                </button>
               </div>
             </div>
             {error && (
@@ -427,10 +480,9 @@ export default function Dashboard() {
             )}
           </form>
         </div>        {results.length > 0 && (
-          <div className="space-y-8">
-            <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
+          <div className="space-y-8">            <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
               <CheckCircle className="w-5 h-5" />
-              <span>Paper processed successfully! Summary available below.</span>
+              <span>Paper processed successfully! Summary available below and saved to your <Link to="/history" className="text-accent-600 hover:text-accent-700 underline">history</Link>.</span>
             </div>
 
             {results.map((paper, index) => (
@@ -501,167 +553,188 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
-          </div>
-        )}        {/* File Upload Section - New Addition */}
-        <div className="relative bg-gradient-to-tr from-primary-50/90 to-accent-50/80 rounded-3xl shadow-card p-8 mb-8 border border-white/40 overflow-hidden">
-          <div className="absolute inset-0 bg-white/40 backdrop-blur-sm -z-10"></div>
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-400 via-accent-400 to-secondary-400"></div>
-          
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl mr-3">
-                <Upload className="w-6 h-6 text-primary-600" />
-              </div>
-              <h3 className="text-2xl font-display font-bold text-gray-800">Upload Research Paper</h3>
-            </div>
-          </div>
-          
-          {uploadSuccess && (
-            <div className="mb-6 flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3 animate-fadeIn">
-              <Check className="w-5 h-5" />
-              <span>{uploadSuccess}</span>
-            </div>
-          )}
-          
-          {error && (
-            <div className="mb-6 flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3 animate-fadeIn">
-              <AlertCircle className="w-5 h-5" />
-              <span>{error}</span>
-            </div>
-          )}
-          
-          <div className="space-y-6">
-            {/* Dropzone */}
-            <div 
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
-                isDragging 
-                  ? 'border-accent-400 bg-accent-50/50' 
-                  : 'border-gray-300 hover:border-primary-300 bg-white/60'
-              }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <div className={`p-4 rounded-full ${isDragging ? 'bg-accent-100' : 'bg-gray-100'} transition-colors duration-200`}>
-                  <Upload className={`w-8 h-8 ${isDragging ? 'text-accent-600' : 'text-gray-500'}`} />
+          </div>        )}
+
+        {/* Upload Section - Show when button is clicked */}
+        {showUploadSection && (
+          <div className="relative bg-gradient-to-tr from-primary-50/90 to-accent-50/80 rounded-3xl shadow-card p-8 mb-8 border border-white/40 overflow-hidden">
+            <div className="absolute inset-0 bg-white/40 backdrop-blur-sm -z-10"></div>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-400 via-accent-400 to-secondary-400"></div>
+            
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl mr-3">
+                  <Upload className="w-6 h-6 text-primary-600" />
                 </div>
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-lg text-gray-700">Drag and drop your PDF files here</h4>
-                  <p className="text-gray-500 text-sm">or</p>
-                  <label className="inline-block px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium rounded-xl hover:shadow-glow cursor-pointer transition-all duration-200">
-                    Browse Files                    <input 
-                      ref={fileInputRef}
-                      type="file" 
-                      accept=".pdf" 
-                      multiple 
-                      className="hidden" 
-                      onChange={handleFileSelect}
-                    />
-                  </label>
-                  <p className="text-xs text-gray-400 mt-2">Accepted formats: PDF only</p>
-                </div>
+                <h3 className="text-2xl font-display font-bold text-gray-800">Upload Research Paper</h3>
               </div>
             </div>
             
-            {/* File list with preview buttons */}
-            {uploadedFiles.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-700">Selected Files ({uploadedFiles.length})</h4>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="max-h-64 overflow-y-auto">
-                    {uploadedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors duration-150">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-gray-100 rounded-lg">
-                            <File className="w-5 h-5 text-primary-500" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-700">{file.name}</p>
-                            <p className="text-xs text-gray-400">{formatFileSize(file.size)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {file.type === 'application/pdf' && (
-                            <button 
-                              onClick={() => handlePreview(file)}
-                              className="p-1.5 bg-gray-100 hover:bg-blue-100 hover:text-blue-500 rounded-full transition-colors duration-150"
-                              title="Preview PDF"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => removeFile(index)}
-                            className="p-1.5 bg-gray-100 hover:bg-red-100 hover:text-red-500 rounded-full transition-colors duration-150"
-                            title="Remove file"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex justify-end">                  <button
-                    onClick={handleUpload}
-                    disabled={isProcessing || uploadedFiles.length === 0}
-                    className="px-6 py-2.5 bg-gradient-to-r from-accent-500 to-accent-600 text-white font-semibold rounded-xl hover:shadow-purple-glow focus:ring-2 focus:ring-accent-400 focus:ring-offset-2 transition-all duration-300 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Processing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        <span>Upload Files</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}            {/* PDF Preview Modal - Reduced Height */}
-            {previewUrl && previewFile && (
-              <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-8">
-                <div className="bg-white rounded-2xl shadow-xl w-[700px] h-[500px] flex flex-col">
-                  <div className="flex items-center justify-between border-b p-3 bg-gradient-to-r from-primary-500 to-accent-500 rounded-t-2xl">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-xl text-white truncate max-w-[350px]">
-                        Preview: {previewFile.name}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <a 
-                        href={previewUrl} 
-                        download={previewFile.name}
-                        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-accent-700 font-medium rounded-xl transition-colors duration-150"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Download</span>
-                      </a>
-                      <button 
-                        onClick={closePreview}
-                        className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors duration-150 flex items-center gap-2"
-                      >
-                        <X className="w-5 h-5" />
-                        <span>Close</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-h-0">
-                    <iframe 
-                      src={previewUrl} 
-                      className="w-full h-full rounded-b-2xl" 
-                      title={`Preview of ${previewFile.name}`}
-                    ></iframe>
-                  </div>
-                </div>
+            {uploadSuccess && (
+              <div className="mb-6 flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3 animate-fadeIn">
+                <Check className="w-5 h-5" />
+                <span>{uploadSuccess}</span>
               </div>
             )}
+            
+            {error && (
+              <div className="mb-6 flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3 animate-fadeIn">
+                <AlertCircle className="w-5 h-5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="space-y-6 animate-fadeIn">
+              {/* Dropzone */}
+              <div 
+                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
+                  isDragging 
+                    ? 'border-accent-400 bg-accent-50/50' 
+                    : 'border-gray-300 hover:border-primary-300 bg-white/60'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <div className={`p-4 rounded-full ${isDragging ? 'bg-accent-100' : 'bg-gray-100'} transition-colors duration-200`}>
+                    <Upload className={`w-8 h-8 ${isDragging ? 'text-accent-600' : 'text-gray-500'}`} />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-lg text-gray-700">Drag and drop your PDF files here</h4>
+                    <p className="text-gray-500 text-sm">or</p>
+                    <label className="inline-block px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium rounded-xl hover:shadow-glow cursor-pointer transition-all duration-200">
+                      Browse Files
+                      <input 
+                        ref={fileInputRef}
+                        type="file" 
+                        accept=".pdf" 
+                        multiple 
+                        className="hidden" 
+                        onChange={handleFileSelect}
+                      />
+                    </label>
+                    <p className="text-xs text-gray-400 mt-2">Accepted formats: PDF only</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* File list with preview buttons */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-700">Selected Files ({uploadedFiles.length})</h4>
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto">
+                      {uploadedFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors duration-150">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-gray-100 rounded-lg">
+                              <File className="w-5 h-5 text-primary-500" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">{file.name}</p>
+                              <p className="text-xs text-gray-400">{formatFileSize(file.size)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {file.type === 'application/pdf' && (
+                              <button 
+                                onClick={() => handlePreview(file)}
+                                className="p-1.5 bg-gray-100 hover:bg-blue-100 hover:text-blue-500 rounded-full transition-colors duration-150"
+                                title="Preview PDF"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => removeFile(index)}
+                              className="p-1.5 bg-gray-100 hover:bg-red-100 hover:text-red-500 rounded-full transition-colors duration-150"
+                              title="Remove file"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center gap-4 mt-6">
+                    <button
+                      onClick={() => {
+                        setShowUploadSection(false);
+                        // Clear any selected files when canceling
+                        setUploadedFiles([]);
+                      }}
+                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 font-medium rounded-xl focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-300 flex items-center space-x-2"
+                      disabled={isProcessing}
+                    >
+                      <X className="w-5 h-5" />
+                      <span>Cancel</span>
+                    </button>
+                    
+                    <button
+                      onClick={handleUpload}
+                      disabled={isProcessing || uploadedFiles.length === 0}
+                      className="px-8 py-3 bg-gradient-to-r from-accent-500 to-accent-600 text-white font-semibold rounded-xl hover:shadow-purple-glow focus:ring-2 focus:ring-accent-400 focus:ring-offset-2 transition-all duration-300 flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5" />
+                          <span>Upload and Process Files</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PDF Preview Modal */}
+              {previewUrl && previewFile && (
+                <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-8">
+                  <div className="bg-white rounded-2xl shadow-xl w-[700px] h-[500px] flex flex-col">
+                    <div className="flex items-center justify-between border-b p-3 bg-gradient-to-r from-primary-500 to-accent-500 rounded-t-2xl">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-xl text-white truncate max-w-[350px]">
+                          Preview: {previewFile.name}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <a 
+                          href={previewUrl} 
+                          download={previewFile.name}
+                          className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-accent-700 font-medium rounded-xl transition-colors duration-150"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Download</span>
+                        </a>
+                        <button 
+                          onClick={closePreview}
+                          className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors duration-150 flex items-center gap-2"
+                        >
+                          <X className="w-5 h-5" />
+                          <span>Close</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <iframe 
+                        src={previewUrl} 
+                        className="w-full h-full rounded-b-2xl" 
+                        title={`Preview of ${previewFile.name}`}
+                      ></iframe>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Uploaded Papers Results Section */}
         {uploadedResults.length > 0 && (
@@ -676,9 +749,12 @@ export default function Dashboard() {
                 </div>
                 <h3 className="text-2xl font-display font-bold text-gray-800">Uploaded Paper Summaries</h3>
               </div>
-              
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500 mr-2">Found {uploadedResults.length} summaries</span>
+                <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-500">Found {uploadedResults.length} summaries</span>
+                <Link to="/history" className="flex items-center space-x-2 text-accent-600 hover:text-accent-700 transition-all duration-200">
+                  <HistoryIcon className="w-4 h-4" />
+                  <span>View all in History</span>
+                </Link>
               </div>
             </div>
               <div className="space-y-8">
