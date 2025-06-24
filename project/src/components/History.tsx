@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { ArrowLeft, ExternalLink, Clipboard, Loader2, Trash2, AlertCircle, History as HistoryIcon, FileText } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Clipboard, Loader2, Trash2, AlertCircle, History as HistoryIcon, FileText, Upload } from 'lucide-react';
 
 interface Paper {
   id: string;
@@ -135,9 +135,7 @@ export function History() {
       }
     }
     
-    fetchPapers();
-  }, [user]);
-
+    fetchPapers();  }, [user]);
   // Function to format date in a readable way
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -145,6 +143,18 @@ export function History() {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+    });
+  };
+  // Function to format date with time in Thai timezone but English text
+  const formatDateWithTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Bangkok'
     });
   };
 
@@ -289,18 +299,25 @@ export function History() {
                     <tr
                       className="hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-secondary-50/50 transition-all duration-200 cursor-pointer group"
                       onClick={() => toggleSummary(paper.id)}
-                    >
-                      <td className="px-4 py-4">
+                    >                      <td className="px-4 py-4">
                         <div className="text-sm font-medium text-secondary-600 group-hover:text-accent-600 transition-colors duration-200">
-                          <a
-                            href={paper.pdf_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:underline"
-                          >
-                            {truncateText(paper.title, 60)}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            {paper.authors === 'Uploaded by you' && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                <Upload className="w-3 h-3 mr-1" />
+                                Uploaded
+                              </span>
+                            )}
+                            <a
+                              href={paper.pdf_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="hover:underline"
+                            >
+                              {truncateText(paper.title, 50)}
+                            </a>
+                          </div>
                         </div>
                         <div className="mt-1 text-xs text-gray-500 italic">
                           {truncateText(paper.summary, 70)}
@@ -317,19 +334,31 @@ export function History() {
                         <p className="text-sm text-gray-700 bg-secondary-50 px-2 py-1 rounded-full inline-block font-medium group-hover:bg-secondary-100 transition-colors duration-200">
                           {paper.published ? formatDate(paper.published) : 'Unknown'}
                         </p>
-                      </td>
-                      <td className="px-4 py-4">
+                      </td>                      <td className="px-4 py-4">
                         <p className="text-sm text-gray-700 bg-primary-50 px-2 py-1 rounded-full inline-block font-medium group-hover:bg-primary-100 transition-colors duration-200">
-                          {formatDate(paper.created_at)}
+                          {formatDateWithTime(paper.created_at)}
                         </p>
-                      </td>                      
+                      </td>
                       <td className="px-4 py-4 text-sm">
-                        <div className="flex justify-center space-x-4">
-                          <button
+                        <div className="flex justify-center space-x-4">                          <button
                             className="flex items-center justify-center px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:shadow-soft"
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.open(paper.pdf_link, '_blank');
+                              
+                              // Handle different types of PDF links
+                              if (paper.pdf_link === '#') {
+                                alert('PDF file is not available. This file was uploaded but file storage is not configured. Please follow the setup instructions in STORAGE_SETUP.md to enable file access.');
+                              } else if (paper.pdf_link.includes('supabase') && paper.pdf_link.includes('storage')) {
+                                // For Supabase storage files, show helpful message if it fails
+                                try {
+                                  window.open(paper.pdf_link, '_blank');
+                                } catch (error) {
+                                  alert('Cannot open uploaded PDF. Storage bucket may not be configured as public. Check STORAGE_SETUP.md for instructions.');
+                                }
+                              } else {
+                                // For ArXiv and other external links
+                                window.open(paper.pdf_link, '_blank');
+                              }
                             }}
                             title="View PDF"
                           >

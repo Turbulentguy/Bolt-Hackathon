@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabase';
+import { setupStorageBucket } from '../utils/setup-storage';
 import {
   LogOut, Search, FileText, Download,
   AlertCircle, CheckCircle, Loader2,
@@ -108,10 +109,23 @@ export default function Dashboard() {
         fullText: "",
         summary: "This paper demonstrates that large language models can improve their own performance by generating synthetic training data, evaluating it, and using the high-quality examples to further train themselves."
       }
-    ];
-    
+    ];    
     setAllPapers(allPapers);
   }, []);
+
+  // Setup storage bucket on component mount
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        await setupStorageBucket();
+      } catch (error) {
+        console.error('Failed to initialize storage bucket:', error);
+      }
+    };
+    
+    initializeStorage();
+  }, []);
+  
   const processQuery = async (searchQuery: string): Promise<void> => {
     setIsProcessing(true);
     setError('');
@@ -252,8 +266,35 @@ export default function Dashboard() {
         if (!file.name.endsWith('.pdf')) {
           console.warn(`Skipping non-PDF file: ${file.name}`);
           continue;
-        }
+        }          // Try to upload file to Supabase Storage, fallback if bucket doesn't exist
+        let publicUrl = '#'; // Default fallback
         
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `uploads/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('papers')
+            .upload(filePath, file);
+
+          if (uploadError) {
+            console.warn('Storage upload failed, continuing without file storage:', uploadError.message);
+            // Don't throw error, just use fallback
+          } else {
+            // Get public URL for the uploaded file
+            const { data: urlData } = supabase.storage
+              .from('papers')
+              .getPublicUrl(filePath);
+
+            publicUrl = urlData.publicUrl;
+            console.log('File uploaded successfully to storage:', publicUrl);
+          }
+        } catch (storageError) {
+          console.warn('Storage operation failed, continuing without file storage:', storageError);
+          // Continue with processing even if storage fails
+        }
+
         // Create form data
         const formData = new FormData();
         formData.append('file', file);
@@ -274,13 +315,12 @@ export default function Dashboard() {
         } catch (jsonError) {
           console.error('JSON parsing error:', jsonError);
           throw new Error(`Failed to parse response for file ${file.name}. Server response was not valid JSON.`);
-        }
-          // Add to uploaded results
+        }          // Add to uploaded results
         const paper: PaperResult = {
           title: data.title || file.name,
           authors: ['Uploaded by you'],
           abstract: data.summary || 'No summary available',
-          pdfUrl: '#', // No direct URL for uploaded files
+          pdfUrl: publicUrl, // Use the public URL from Supabase Storage
           arxivUrl: '#',
           publishedDate: new Date().toISOString(),
           fullText: data.summary || 'No content available',
@@ -288,8 +328,7 @@ export default function Dashboard() {
         };
           // Add to uploaded results at the end (new items at the bottom)
         setUploadedResults(prev => [...prev, paper]);
-        
-        // Save to Supabase for history
+          // Save to Supabase for history
         try {
           const { error } = await supabase
             .from('papers')
@@ -297,7 +336,7 @@ export default function Dashboard() {
               title: data.title || file.name,
               authors: 'Uploaded by you',
               published: new Date().toISOString(),
-              pdf_link: '#', // No direct URL for uploaded files
+              pdf_link: publicUrl, // Use the public URL from Supabase Storage or fallback
               bibtex: '',
               summary: data.summary || 'No summary available',
               created_at: new Date().toISOString()
@@ -310,7 +349,12 @@ export default function Dashboard() {
           console.error('Error saving to Supabase:', supabaseError);
           // Don't throw the error here, we want to continue even if saving to history fails
         }
-          setUploadSuccess(`Successfully processed file: ${file.name} and saved to history`);
+
+        const successMessage = publicUrl !== '#' 
+          ? `Successfully processed file: ${file.name} and saved to history with file storage`
+          : `Successfully processed file: ${file.name} and saved to history (file storage unavailable - check console for setup instructions)`;
+          
+        setUploadSuccess(successMessage);
       }
         // Clear the files list after successful upload
       setUploadedFiles([]);
