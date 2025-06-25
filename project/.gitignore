@@ -1,30 +1,117 @@
-# Node dependencies
+# Node
 node_modules/
-
-# Build output
-dist/
-dist-ssr/
-
-# Local environment files
-.env
-*.local
-
-# npm / yarn / pnpm logs
-logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-# IDE/editor files
-.vscode/*
-!.vscode/extensions.json
-.idea/
+# Build output
+/build
+/dist
+*.tsbuildinfo
+
+# React/Vite/Next
+*.local
+.next/
+out/
+
+# Mac
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Others
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.rej
+*.backup
+*.old
+*.save
+
+# Supabase
+.supabase/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+env/
+venv/
+ENV/
+VENV/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pot
+*.db
+*.sqlite3
+*.tar.gz
+*.whl
+*.zip
+*.bak
+*.tmp
+*.swp
+*.swo
+*.env
+*.venv
+*.log
+
+# Jupyter
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+.nox/
+.tox/
+.pytest_cache/
+.hypothesis/
+
+# Test/Debug
+.DS_Store
+*.test.js.snap
+*.spec.js.snap
+*.test.ts.snap
+*.spec.ts.snap
+*.test.jsx.snap
+*.spec.jsx.snap
+*.test.tsx.snap
+*.spec.tsx.snap
+
+# Misc
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+
+# Local env/config
+.env
+.env.*
+.envrc
+*.local
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# Backup
+*~
+
+# Temporary
+/tmp/
+
+# System
+lost+found/

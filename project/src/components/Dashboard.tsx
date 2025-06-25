@@ -12,6 +12,7 @@ import {
   RefreshCw, BookOpen
 } from 'lucide-react';
 import DiscordCanary from '../assets/Discord_Canary.png';
+import PaperRAGChatModal from "./PaperRAGChatModal";
 
 interface PaperResult {
   title: string;
@@ -48,6 +49,7 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('cs.AI');
   const [currentPage, setCurrentPage] = useState(0);
   const [maxResults, setMaxResults] = useState(20);
+  const [chatPaper, setChatPaper] = useState<PaperResult|null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Load all papers from API
   const loadAllPapersFromAPI = async () => {
@@ -1035,7 +1037,15 @@ export default function Dashboard() {
                     </div>
                     
                     {/* Actions */}
-                    <div className="flex md:flex-col gap-2 justify-end md:min-w-[140px]">                      <button 
+                    <div className="flex md:flex-col gap-2 justify-end md:min-w-[140px]">
+                      <button
+                        onClick={() => setChatPaper(paper)}
+                        className="w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg"
+                        style={{ marginBottom: 8 }}
+                      >
+                        💬 Chat
+                      </button>
+                      <button 
                         onClick={() => processQuery(paper.pdfUrl, paper.pdfUrl)}
                         disabled={isProcessing}
                         className={`w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 ${
@@ -1043,7 +1053,8 @@ export default function Dashboard() {
                             ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                             : 'bg-gradient-to-r from-accent-500 to-accent-600 text-white hover:shadow-purple-glow'
                         }`}
-                      >                        {isProcessing ? (
+                      >
+                        {isProcessing ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span>Processing...</span>
@@ -1060,7 +1071,6 @@ export default function Dashboard() {
                           </>
                         )}
                       </button>
-                      
                       <div className="flex gap-2 w-full">
                         <a 
                           href={paper.arxivUrl}
@@ -1096,6 +1106,11 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* Chat Modal - Show when a paper card's chat button is clicked */}
+      {chatPaper && (
+        <PaperRAGChatModal paper={chatPaper} onClose={() => setChatPaper(null)} />
+      )}
     </div>
   );
 }
