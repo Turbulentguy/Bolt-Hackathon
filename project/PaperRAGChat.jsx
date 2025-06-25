@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 
 // Utility สำหรับดึง API URL จาก env (รองรับ Vite)
 const API_URL = import.meta.env.VITE_API_URL || "";
+const RAG_API = API_URL + "/api";
 
 const categories = [
   { value: "cs.AI", label: "Artificial Intelligence" },
@@ -32,6 +33,23 @@ async function fetchPdfFile(url, onProgress) {
   return new File([blob], url.split('/').pop() || 'paper.pdf', { type: blob.type });
 }
 
+// ปรับปรุงฟังก์ชันสร้าง session จาก URL ให้รับ RAG_API
+async function createRagSessionFromUrl(pdfUrl, setProgress) {
+  setProgress("กำลังสร้าง session จาก URL ...");
+  const res = await fetch(`${RAG_API}/create_rag_session_from_url`, {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdf_url: pdfUrl })
+  });
+  if (res.ok) {
+    const data = await res.json();
+    return data.session_id;
+  } else {
+    setProgress("สร้าง session ไม่สำเร็จ");
+    return null;
+  }
+}
+
 export default function PaperRAGChat({ paperTitle, papers }) {
   const [pdf, setPdf] = useState(null);
   const [sessionId, setSessionId] = useState("");
@@ -52,7 +70,8 @@ export default function PaperRAGChat({ paperTitle, papers }) {
     setShowChat(true);
     const formData = new FormData();
     formData.append("pdf", pdf);
-    const res = await fetch(`${API_URL}/chatbot/create_rag_session`, {
+    // กลับไปยิงที่ /api/create_rag_session (Node.js จะ proxy ให้เอง)
+    const res = await fetch(`${RAG_API}/create_rag_session`, {
       method: "POST",
       body: formData,
     });
@@ -61,7 +80,7 @@ export default function PaperRAGChat({ paperTitle, papers }) {
       setSessionId(data.session_id);
       setProgress("Processing...");
       polling.current = setInterval(async () => {
-        const progRes = await fetch(`${API_URL}/chatbot/rag_progress/${data.session_id}`);
+        const progRes = await fetch(`${RAG_API}/rag_progress/${data.session_id}`);
         const progData = await progRes.json();
         setProgress(progData.progress);
         if (progData.progress && progData.progress.startsWith("Completed")) {
@@ -80,7 +99,8 @@ export default function PaperRAGChat({ paperTitle, papers }) {
     const formData = new FormData();
     formData.append("session_id", sessionId);
     formData.append("message", message);
-    const res = await fetch(`${API_URL}/chatbot/chat_with_rag`, {
+    // ส่ง chat ไปที่ proxy Node.js (ผ่าน /chatbot/chat_with_rag) โดยใช้ RAG_API
+    const res = await fetch(`${RAG_API}/chat_with_rag`, {
       method: "POST",
       body: formData,
     });
@@ -100,11 +120,30 @@ export default function PaperRAGChat({ paperTitle, papers }) {
 
   // ฟังก์ชันเมื่อกดปุ่ม Chat ในแต่ละ paper
   const handleChat = async (paper) => {
-    setProgress("กำลังดาวน์โหลด PDF (0%) ...");
-    const file = await fetchPdfFile(paper.pdfUrl, percent => setProgress(`กำลังดาวน์โหลด PDF (${percent}%) ...`));
-    setPdf(file);
-    setShowChat(true);
-    setTimeout(() => startChatWithPaper(), 100);
+    if (paper.pdfUrl && paper.pdfUrl.startsWith('http')) {
+      setProgress("กำลังสร้าง session จาก URL ...");
+      // ส่งไปที่ RAG_API (proxy) แทน RAG_API + /api
+      const session_id = await createRagSessionFromUrl(paper.pdfUrl, setProgress);
+      if (session_id) {
+        setSessionId(session_id);
+        setShowChat(true);
+        // polling progress
+        polling.current = setInterval(async () => {
+          const progRes = await fetch(`${RAG_API}/rag_progress/${session_id}`);
+          const progData = await progRes.json();
+          setProgress(progData.progress);
+          if (progData.progress && progData.progress.startsWith("Completed")) {
+            clearInterval(polling.current);
+          }
+        }, 1000);
+      }
+    } else {
+      setProgress("กำลังดาวน์โหลด PDF (0%) ...");
+      const file = await fetchPdfFile(paper.pdfUrl, percent => setProgress(`กำลังดาวน์โหลด PDF (${percent}%) ...`));
+      setPdf(file);
+      setShowChat(true);
+      setTimeout(() => startChatWithPaper(), 100);
+    }
   };
 
   const filteredPapers = selectedCategory
