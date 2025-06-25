@@ -131,7 +131,7 @@ export default function Dashboard() {
   // Load papers on component mount
   useEffect(() => {
     loadAllPapersFromAPI();
-  }, [selectedCategory, currentPage, maxResults]);  const processQuery = async (searchQuery: string, existingPdfUrl?: string): Promise<void> => {
+  }, [selectedCategory, currentPage, maxResults]);  const processQuery = async (searchQuery: string, existingPdfUrl?: string, originalPaper?: PaperResult): Promise<void> => {
     setIsProcessing(true);
     setError('');
     setResults([]);
@@ -139,38 +139,27 @@ export default function Dashboard() {
     try {
       let data;
       const cacheKey = existingPdfUrl || searchQuery;
-      
       // Check if we already have this paper processed
       if (processedPapers.has(cacheKey)) {
-        console.log('Using cached result for:', cacheKey);
         const cachedPaper = processedPapers.get(cacheKey)!;
         setResults([cachedPaper]);
         setIsProcessing(false);
         return;
       }
-      
-      console.log('Processing query:', searchQuery, 'with PDF URL:', existingPdfUrl);
-      
       // If we have an existing PDF URL, use it for summarization directly
       if (existingPdfUrl && existingPdfUrl !== '' && existingPdfUrl !== '#') {
-        console.log('Using PDF URL for direct summarization:', existingPdfUrl);
-        // Use the PDF URL directly for summarization
         data = await ArxivApiService.summarizePaper(existingPdfUrl);
       } else {
-        // Search and get paper data first (fallback for manual search)
-        console.log('Searching for paper:', searchQuery);
         data = await ArxivApiService.summarizePaper(searchQuery);
       }
-
-      console.log('API Response:', data);
-
+      // Use the originalPaper's title if provided, else fallback to API or searchQuery
       const paper: PaperResult = {
-        title: data.title || searchQuery || 'No title',
+        title: (originalPaper && originalPaper.title) || data.title || searchQuery || 'No title',
         authors: data.authors ? (typeof data.authors === 'string' ? data.authors.split(',').map((a: string) => a.trim()) : data.authors) : ['Unknown authors'],
         abstract: data.abstract || data.summary || 'No abstract available',
         pdfUrl: data.pdf_link || existingPdfUrl || '',
         arxivUrl: data.arxiv_url || (data.pdf_link ? data.pdf_link.replace('/pdf/', '/abs/') : '#'),
-        publishedDate: data.published || new Date().toISOString(),
+        publishedDate: data.published || (originalPaper && originalPaper.publishedDate) || new Date().toISOString(),
         fullText: data.summary || data.abstract || 'No content available',
         summary: data.summary || 'No summary available'
       };
@@ -1046,7 +1035,7 @@ export default function Dashboard() {
                         💬 Chat
                       </button>
                       <button 
-                        onClick={() => processQuery(paper.pdfUrl, paper.pdfUrl)}
+                        onClick={() => processQuery(paper.pdfUrl, paper.pdfUrl, paper)}
                         disabled={isProcessing}
                         className={`w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 ${
                           isProcessed 
