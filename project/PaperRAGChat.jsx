@@ -54,32 +54,32 @@ const formatMessage = (text) => {
   
   // แปลงข้อความให้มี formatting
   return text
-    // จัดการ Markdown headers (largest to smallest)
-    .replace(/^##### (.*$)/gm, '<h5 style="font-size: 14px; font-weight: bold; margin: 8px 0 4px 0; color: inherit;">$1</h5>')
-    .replace(/^#### (.*$)/gm, '<h4 style="font-size: 16px; font-weight: bold; margin: 10px 0 4px 0; color: inherit;">$1</h4>')
-    .replace(/^### (.*$)/gm, '<h3 style="font-size: 18px; font-weight: bold; margin: 10px 0 5px 0; color: inherit;">$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2 style="font-size: 20px; font-weight: bold; margin: 12px 0 6px 0; color: inherit;">$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1 style="font-size: 22px; font-weight: bold; margin: 14px 0 8px 0; color: inherit;">$1</h1>')
+    // จัดการ Markdown headers (largest to smallest) with better spacing and styling
+    .replace(/^##### (.*$)/gm, '<h5 style="font-size: 14px; font-weight: bold; margin: 16px 0 8px 0; color: inherit; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 4px;">$1</h5>')
+    .replace(/^#### (.*$)/gm, '<h4 style="font-size: 16px; font-weight: bold; margin: 18px 0 10px 0; color: inherit; border-bottom: 1px solid rgba(0,0,0,0.15); padding-bottom: 4px;">$1</h4>')
+    .replace(/^### (.*$)/gm, '<h3 style="font-size: 18px; font-weight: bold; margin: 20px 0 12px 0; color: inherit; border-bottom: 2px solid rgba(0,0,0,0.2); padding-bottom: 6px;">$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2 style="font-size: 20px; font-weight: bold; margin: 24px 0 14px 0; color: inherit; border-bottom: 2px solid rgba(0,0,0,0.25); padding-bottom: 8px;">$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1 style="font-size: 22px; font-weight: bold; margin: 28px 0 16px 0; color: inherit; border-bottom: 3px solid rgba(0,0,0,0.3); padding-bottom: 10px;">$1</h1>')
+    
+    // Enhanced Bold and Italic with better styling
+    .replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight: 700; color: inherit;">$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em style="font-style: italic; color: inherit;">$1</em>')
     
     // จัดการ Math notation - ป้องกันการแปลงใน $...$ และ $$...$$
-    .replace(/\$\$([^$]+)\$\$/g, '<span style="font-family: monospace; background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px; font-size: 13px;">$$1$</span>')
-    .replace(/\$([^$]+)\$/g, '<span style="font-family: monospace; background: rgba(0,0,0,0.1); padding: 1px 3px; border-radius: 3px; font-size: 13px;">$1</span>')
+    .replace(/\$\$([^$]+)\$\$/g, '<div style="font-family: monospace; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; font-size: 13px; margin: 8px 0; text-align: center; border-left: 3px solid rgba(0,0,0,0.3);">$$1$</div>')
+    .replace(/\$([^$]+)\$/g, '<span style="font-family: monospace; background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px; font-size: 13px;">$1</span>')
     
-    // Bold และ Italic
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    // จัดการ Code blocks และ inline code with better styling
+    .replace(/```([^`]+)```/g, '<pre style="background: rgba(0,0,0,0.1); padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; margin: 12px 0; overflow-x: auto; border-left: 4px solid rgba(0,0,0,0.3); line-height: 1.4;">$1</pre>')
+    .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 13px; font-weight: 500;">$1</code>')
     
-    // จัดการ Code blocks และ inline code
-    .replace(/```([^`]+)```/g, '<pre style="background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 4px 0; overflow-x: auto;">$1</pre>')
-    .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 1px 3px; border-radius: 3px; font-family: monospace; font-size: 13px;">$1</code>')
+    // จัดการ Lists with better spacing and styling
+    .replace(/^(\d+)\.\s+(.+$)/gm, '<div style="margin: 6px 0; padding-left: 8px; border-left: 2px solid rgba(0,0,0,0.1);">$1. <strong>$2</strong></div>')
+    .replace(/^[-*+]\s+(.+$)/gm, '<div style="margin: 6px 0; padding-left: 8px; border-left: 2px solid rgba(0,0,0,0.1);">• <strong>$2</strong></div>')
     
-    // จัดการ Lists - เฉพาะที่เริ่มต้นบรรทัด
-    .replace(/^(\d+)\.\s+(.+$)/gm, '<div style="margin: 2px 0;">$1. $2</div>')
-    .replace(/^[-*+]\s+(.+$)/gm, '<div style="margin: 2px 0;">• $1</div>')
-    
-    // จัดการ paragraph breaks - เฉพาะที่จำเป็น
-    .replace(/\n\s*\n/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>')
+    // Enhanced paragraph breaks with better spacing
+    .replace(/\n\s*\n/g, '<div style="margin: 16px 0;"></div>')
+    .replace(/\n/g, '<br style="line-height: 1.6;">')
     
     .trim();
 };
@@ -102,7 +102,7 @@ async function createRagSessionFromUrl(pdfUrl, setProgress) {
 // เพิ่ม CSS สำหรับ formatting ข้อความ
 const messageStyle = `
   .message-content strong {
-    font-weight: bold;
+    font-weight: 700;
     color: inherit;
   }
   .message-content em {
@@ -112,22 +112,75 @@ const messageStyle = `
   .message-content h1,
   .message-content h2,
   .message-content h3,
-  .message-content h4 {
-    margin: 8px 0 4px 0;
+  .message-content h4,
+  .message-content h5 {
     color: inherit;
+    line-height: 1.3;
+  }
+  .message-content h1 {
+    font-size: 22px;
+    margin: 28px 0 16px 0;
+    border-bottom: 3px solid rgba(0,0,0,0.3);
+    padding-bottom: 10px;
+  }
+  .message-content h2 {
+    font-size: 20px;
+    margin: 24px 0 14px 0;
+    border-bottom: 2px solid rgba(0,0,0,0.25);
+    padding-bottom: 8px;
+  }
+  .message-content h3 {
+    font-size: 18px;
+    margin: 20px 0 12px 0;
+    border-bottom: 2px solid rgba(0,0,0,0.2);
+    padding-bottom: 6px;
+  }
+  .message-content h4 {
+    font-size: 16px;
+    margin: 18px 0 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.15);
+    padding-bottom: 4px;
+  }
+  .message-content h5 {
+    font-size: 14px;
+    margin: 16px 0 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    padding-bottom: 4px;
   }
   .message-content code {
     font-family: 'Courier New', monospace;
     font-size: 13px;
+    font-weight: 500;
+    background: rgba(0,0,0,0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
   }
   .message-content pre {
     font-family: 'Courier New', monospace;
     font-size: 12px;
     white-space: pre-wrap;
     word-wrap: break-word;
+    background: rgba(0,0,0,0.1);
+    padding: 12px;
+    border-radius: 6px;
+    margin: 12px 0;
+    border-left: 4px solid rgba(0,0,0,0.3);
+    line-height: 1.4;
   }
   .message-content br {
-    line-height: 1.4;
+    line-height: 1.6;
+  }
+  .message-content p {
+    margin: 8px 0;
+    line-height: 1.6;
+  }
+  .message-content ul, .message-content ol {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .message-content li {
+    margin: 4px 0;
+    line-height: 1.5;
   }
 `;
 
@@ -449,53 +502,7 @@ export default function PaperRAGChat({ paperTitle, papers }) {
         </div>
       )}
       
-      {!showChat && (
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Upload Your Own Paper</h3>
-          <div className="flex items-center gap-4">
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={handleFileChange}
-              className="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer"
-            />
-            <button 
-              onClick={startChatWithPaper} 
-              disabled={!pdf}
-              style={{
-                padding: "12px 32px",
-                borderRadius: "12px",
-                fontWeight: "bold",
-                fontSize: "14px",
-                transition: "all 0.3s ease",
-                boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
-                border: "none",
-                cursor: pdf ? "pointer" : "not-allowed",
-                background: pdf 
-                  ? "linear-gradient(135deg, #10B981, #059669, #0D9488)" 
-                  : "linear-gradient(135deg, #D1D5DB, #9CA3AF)",
-                color: pdf ? "white" : "#6B7280"
-              }}
-              onMouseEnter={(e) => {
-                if (pdf) {
-                  e.target.style.transform = "translateY(-2px) scale(1.02)";
-                  e.target.style.boxShadow = "0 8px 25px rgba(0,0,0,0.3)";
-                  e.target.style.background = "linear-gradient(135deg, #059669, #047857, #0F766E)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (pdf) {
-                  e.target.style.transform = "translateY(0) scale(1)";
-                  e.target.style.boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
-                  e.target.style.background = "linear-gradient(135deg, #10B981, #059669, #0D9488)";
-                }
-              }}
-            >
-              🚀 Start Chat
-            </button>
-          </div>
-        </div>
-      )}
+      
       {showChat && (
         <div className="bg-white rounded-xl shadow-xl p-6 max-w-2xl mx-auto border border-gray-200">
           <div className="flex items-center justify-between mb-6">

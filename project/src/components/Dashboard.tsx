@@ -9,7 +9,7 @@ import {
   AlertCircle, CheckCircle, Loader2,
   ExternalLink, Calendar, Users,
   Upload, File, X, Check, Eye, History as HistoryIcon,
-  RefreshCw, BookOpen
+  BookOpen
 } from 'lucide-react';
 import DiscordCanary from '../assets/Discord_Canary.png';
 // @ts-ignore
@@ -635,14 +635,6 @@ export default function Dashboard() {
                 <span>{error}</span>
               </div>
             )}
-            
-            {/* Debug information */}
-            {import.meta.env.DEV && results.length === 0 && !error && !isProcessing && (
-              <div className="flex items-center space-x-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">i</div>
-                <span>Debug: No results to display. Try searching for a paper or check console for API responses.</span>
-              </div>
-            )}
           </form>
         </div>        {results.length > 0 && (
           <div id="results-section" className="space-y-8">
@@ -683,7 +675,7 @@ export default function Dashboard() {
                         dangerouslySetInnerHTML={{ __html: renderMathText(paper.abstract || 'No abstract available') }}
                       ></p>
                     </div>
-                    <div className="flex space-x-4">
+                    <div className="flex flex-wrap gap-4">
                       {paper.arxivUrl && paper.arxivUrl !== '#' && (
                         <a
                           href={paper.arxivUrl}
@@ -706,6 +698,22 @@ export default function Dashboard() {
                           <span>Download PDF</span>
                         </a>
                       )}
+                      <button
+                        onClick={() => handleChatClick(paper)}
+                        disabled={isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+                      >
+                        {isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            💬 <span>Chat</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1013,24 +1021,11 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-white/40 backdrop-blur-sm -z-10"></div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-400 via-accent-400 to-secondary-400"></div>
           
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl mr-3">
-                <BookOpen className="w-6 h-6 text-accent-600" />
-              </div>
-              <h3 className="text-2xl font-display font-bold text-gray-800">Research Papers</h3>
+          <div className="flex items-center mb-6">
+            <div className="p-2 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl mr-3">
+              <BookOpen className="w-6 h-6 text-accent-600" />
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={loadAllPapersFromAPI}
-                disabled={isLoadingAllPapers}
-                className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors duration-200 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoadingAllPapers ? 'animate-spin' : ''}`} />
-                <span>{isLoadingAllPapers ? 'Loading...' : 'Refresh'}</span>
-              </button>
-            </div>
+            <h3 className="text-2xl font-display font-bold text-gray-800">Research Papers</h3>
           </div>
 
           {/* Controls */}

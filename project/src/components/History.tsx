@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { ArrowLeft, ExternalLink, Clipboard, Loader2, Trash2, AlertCircle, History as HistoryIcon, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Trash2, AlertCircle, History as HistoryIcon, Upload } from 'lucide-react';
 
 interface Paper {
   id: string;
@@ -388,18 +388,6 @@ export function History() {
                           >
                             <ExternalLink className="w-4 h-4 mr-1" />
                             <span className="text-xs">View PDF</span>
-                          </button>
-                          <button
-                            className="flex items-center justify-center px-2 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-all duration-200 hover:shadow-soft"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(paper.bibtex);
-                              alert('BibTeX copied to clipboard!');
-                            }}
-                            title="Copy BibTeX"
-                          >
-                            <Clipboard className="w-4 h-4 mr-1" />
-                            <span className="text-xs">BibTeX</span>
                           </button>
                           <button
                             className="flex items-center justify-center px-2 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 hover:shadow-soft"
