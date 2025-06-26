@@ -3,13 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { setupStorageBucket } from '../utils/setup-storage';
+import ArxivApiService from '../utils/api-service';
 import {
   LogOut, Search, FileText, Download,
   AlertCircle, CheckCircle, Loader2,
   ExternalLink, Calendar, Users,
-  Upload, File, X, Check, Eye, History as HistoryIcon
+  Upload, File, X, Check, Eye, History as HistoryIcon,
+  BookOpen
 } from 'lucide-react';
 import DiscordCanary from '../assets/Discord_Canary.png';
+// @ts-ignore
+import PaperRAGChatModal from "./PaperRAGChatModal.jsx";
 
 interface PaperResult {
   title: string;
@@ -32,9 +36,9 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState('');
-  const [results, setResults] = useState<PaperResult[]>([]);
+  const [error, setError] = useState('');  const [results, setResults] = useState<PaperResult[]>([]);
   const [allPapers, setAllPapers] = useState<PaperResult[]>([]);
+  const [processedPapers, setProcessedPapers] = useState<Map<string, PaperResult>>(new Map()); // Cache for processed papers
   const [uploadedResults, setUploadedResults] = useState<PaperResult[]>([]); // สำหรับเก็บผลลัพธ์จากการอัปโหลด
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -42,13 +46,64 @@ export default function Dashboard() {
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showUploadSection, setShowUploadSection] = useState(false);
+  const [isLoadingAllPapers, setIsLoadingAllPapers] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('cs.AI');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [maxResults, setMaxResults] = useState(20);
+  const [chatPaper, setChatPaper] = useState<PaperResult|null>(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatLoadingPaper, setChatLoadingPaper] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Load all papers on component mount
-  useEffect(() => {
-    // In a real app, this would fetch from an API endpoint that returns all papers in the system
-    // For now we're using sample data
-    const allPapers: PaperResult[] = [
+  // Load all papers from API
+  const loadAllPapersFromAPI = async () => {
+    setIsLoadingAllPapers(true);
+    setError('');
+    
+    try {
+      console.log('Loading papers with params:', { category: selectedCategory, maxResults, start: currentPage * maxResults });
+      
+      const response = await ArxivApiService.getAllPapers({
+        category: selectedCategory,
+        maxResults: maxResults,
+        start: currentPage * maxResults
+      });
+      
+      console.log('API Response:', response);
+      
+      if (response.papers && Array.isArray(response.papers)) {
+        // Convert API response to PaperResult format
+        const formattedPapers: PaperResult[] = response.papers.map((paper: any) => ({
+          title: paper.title || 'No title',
+          authors: Array.isArray(paper.authors) ? paper.authors : [paper.authors || 'Unknown'],
+          abstract: paper.abstract || 'No abstract available',
+          pdfUrl: paper.pdf_link || '',
+          arxivUrl: paper.arxiv_url || '#',
+          publishedDate: (paper.published && paper.published !== 'N/A') ? paper.published : '',
+          fullText: paper.abstract || 'No content available',
+          summary: paper.abstract || 'No summary available'
+        }));
+        
+        console.log('Formatted papers:', formattedPapers.length);
+        setAllPapers(formattedPapers);
+      } else {
+        console.warn('No papers found in response:', response);
+        setError('No papers found for the selected category');
+        // Fallback to sample data
+        loadSampleData();
+      }
+    } catch (err: any) {
+      console.error('Error loading papers from API:', err);
+      setError(`Failed to load papers: ${err.message}`);
+      // Fallback to sample data if API fails
+      loadSampleData();
+    } finally {
+      setIsLoadingAllPapers(false);
+    }
+  };
+
+  // Load sample data as fallback
+  const loadSampleData = () => {
+    const samplePapers: PaperResult[] = [
       {
         title: "Attention Is All You Need",
         authors: ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit", "Llion Jones", "Aidan N. Gomez", "Lukasz Kaiser", "Illia Polosukhin"],
@@ -59,60 +114,10 @@ export default function Dashboard() {
         fullText: "",
         summary: "This paper introduces the Transformer architecture that relies entirely on self-attention mechanisms without using recurrence or convolution, achieving state-of-the-art results on machine translation tasks while being more parallelizable and requiring less training time."
       },
-      {
-        title: "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
-        authors: ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
-        abstract: "We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models, BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers.",
-        pdfUrl: "https://arxiv.org/pdf/1810.04805.pdf",
-        arxivUrl: "https://arxiv.org/abs/1810.04805",
-        publishedDate: "2018-10-11",
-        fullText: "",
-        summary: "BERT is a pre-trained language representation model that uses bidirectional transformers to understand context from both directions, achieving state-of-the-art results on a wide range of NLP tasks with minimal task-specific architecture modifications."
-      },
-      {
-        title: "Generative Adversarial Networks",
-        authors: ["Ian J. Goodfellow", "Jean Pouget-Abadie", "Mehdi Mirza", "Bing Xu", "David Warde-Farley", "Sherjil Ozair", "Aaron Courville", "Yoshua Bengio"],
-        abstract: "We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models: a generative model G that captures the data distribution, and a discriminative model D that estimates the probability that a sample came from the training data rather than G.",
-        pdfUrl: "https://arxiv.org/pdf/1406.2661.pdf",
-        arxivUrl: "https://arxiv.org/abs/1406.2661",
-        publishedDate: "2014-06-10",
-        fullText: "",
-        summary: "This paper introduces Generative Adversarial Networks (GANs), a framework where two neural networks contest with each other, allowing for generation of new data instances that resemble the training data through an adversarial training process."
-      },
-      {
-        title: "GPT-3: Language Models are Few-Shot Learners",
-        authors: ["Tom B. Brown", "Benjamin Mann", "Nick Ryder", "Melanie Subbiah", "Jared Kaplan", "Prafulla Dhariwal", "Arvind Neelakantan", "Pranav Shyam", "Girish Sastry", "Amanda Askell"],
-        abstract: "Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. While typically task-agnostic in architecture, this method still requires task-specific fine-tuning datasets. By contrast, humans can generally perform a new language task from only a few examples or from simple instructions...",
-        pdfUrl: "https://arxiv.org/pdf/2005.14165.pdf",
-        arxivUrl: "https://arxiv.org/abs/2005.14165",
-        publishedDate: "2020-05-29",
-        fullText: "",
-        summary: "GPT-3 demonstrates that scaling up language models greatly improves task-agnostic, few-shot performance, sometimes matching or exceeding state-of-the-art systems without any fine-tuning."
-      },
-      {
-        title: "Deep Residual Learning for Image Recognition",
-        authors: ["Kaiming He", "Xiangyu Zhang", "Shaoqing Ren", "Jian Sun"],
-        abstract: "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions...",
-        pdfUrl: "https://arxiv.org/pdf/1512.03385.pdf",
-        arxivUrl: "https://arxiv.org/abs/1512.03385",
-        publishedDate: "2015-12-10",
-        fullText: "",
-        summary: "ResNet introduces skip connections to solve the degradation problem in very deep networks, enabling training of networks with hundreds of layers that achieve state-of-the-art performance on image recognition tasks."
-      },
-      {
-        title: "Large Language Models Can Self-Improve",
-        authors: ["Jiaxin Huang", "Shixiang Shane Gu", "Le Hou", "Yuexin Wu", "Xuezhi Wang", "Hongkun Yu", "Jiawei Han"],
-        abstract: "We explore whether large language models (LLMs) can self-improve. We focus on code generation and present Self-Taught Coder (STC), a method that leverages LLMs to generate more training data and use it to improve itself. STC iteratively generates synthetic training examples, filters them based on the correctness of code execution...",
-        pdfUrl: "https://arxiv.org/pdf/2210.11610.pdf",
-        arxivUrl: "https://arxiv.org/abs/2210.11610",
-        publishedDate: "2022-10-20", 
-        fullText: "",
-        summary: "This paper demonstrates that large language models can improve their own performance by generating synthetic training data, evaluating it, and using the high-quality examples to further train themselves."
-      }
-    ];    
-    setAllPapers(allPapers);
-  }, []);
-
+      // Add more sample papers here...
+    ];
+    setAllPapers(samplePapers);
+  };
   // Setup storage bucket on component mount
   useEffect(() => {
     const initializeStorage = async () => {
@@ -125,63 +130,93 @@ export default function Dashboard() {
     
     initializeStorage();
   }, []);
-  
-  const processQuery = async (searchQuery: string): Promise<void> => {
+
+  // Load papers on component mount
+  useEffect(() => {
+    loadAllPapersFromAPI();
+  }, [selectedCategory, currentPage, maxResults]);  const processQuery = async (searchQuery: string, existingPdfUrl?: string, originalPaper?: PaperResult): Promise<void> => {
     setIsProcessing(true);
     setError('');
     setResults([]);
 
-    try {      const url = `http://127.0.0.1:8000/summarize?query=${encodeURIComponent(searchQuery)}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || 'Failed to fetch paper');
+    try {
+      let data;
+      const cacheKey = existingPdfUrl || searchQuery;
+      // Check if we already have this paper processed
+      if (processedPapers.has(cacheKey)) {
+        const cachedPaper = processedPapers.get(cacheKey)!;
+        setResults([cachedPaper]);
+        setIsProcessing(false);
+        // Scroll to results section when viewing cached summary
+        setTimeout(() => {
+          const resultsSection = document.getElementById('results-section');
+          if (resultsSection) {
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+        return;
       }
-
-      const data = await response.json();
-
+      // If we have an existing PDF URL, use it for summarization directly
+      if (existingPdfUrl && existingPdfUrl !== '' && existingPdfUrl !== '#') {
+        data = await ArxivApiService.summarizePaper(existingPdfUrl);
+      } else {
+        data = await ArxivApiService.summarizePaper(searchQuery);
+      }
+      // Use the originalPaper's title if provided, else fallback to API or searchQuery
       const paper: PaperResult = {
-        title: data.title || 'No title',
-        authors: data.authors?.split(',').map((a: string) => a.trim()) || [],
-        abstract: data.summary || 'No abstract',
-        pdfUrl: data.pdf_link || '',
-        arxivUrl: data.pdf_link.replace('/pdf/', '/abs/'),
-        publishedDate: data.published || '',
-        fullText: data.summary || '',
-        summary: data.summary || ''
+        title: (originalPaper && originalPaper.title) || data.title || searchQuery || 'No title',
+        authors: (originalPaper && originalPaper.authors) || 
+                 (data.authors ? (typeof data.authors === 'string' ? data.authors.split(',').map((a: string) => a.trim()) : data.authors) : ['Unknown authors']),
+        abstract: (originalPaper && originalPaper.abstract) || data.abstract || data.summary || 'No abstract available',
+        pdfUrl: data.pdf_link || existingPdfUrl || '',
+        arxivUrl: data.arxiv_url || (data.pdf_link ? data.pdf_link.replace('/pdf/', '/abs/') : '#'),
+        publishedDate: ((originalPaper && originalPaper.publishedDate && originalPaper.publishedDate !== 'N/A') ? originalPaper.publishedDate : null) || 
+                       ((data.published && data.published !== 'N/A') ? data.published : null) || 
+                       new Date().toISOString(),
+        fullText: data.summary || data.abstract || 'No content available',
+        summary: data.summary || 'No summary available'
       };
 
+      console.log('Created paper object:', paper);
+
+      // Cache the processed paper
+      setProcessedPapers(prev => new Map(prev.set(cacheKey, paper)));
       setResults([paper]);
 
-      // Save to Supabase for history
+      // Scroll to results section after processing
+      setTimeout(() => {
+        const resultsSection = document.getElementById('results-section');
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+
+      // Save to Supabase for history with PDF link
       try {
         const { error } = await supabase
           .from('papers')
           .insert([{
-            title: data.title || 'No title',
-            authors: data.authors || 'Unknown authors',
-            published: data.published || new Date().toISOString(),
-            pdf_link: data.pdf_link || '',
+            title: paper.title || null,
+            authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : (paper.authors || null),
+            published: (paper.publishedDate && paper.publishedDate !== 'N/A') ? paper.publishedDate : null,
+            pdf_link: paper.pdfUrl || null,
             bibtex: '',
-            summary: data.summary || 'No summary available',
+            summary: paper.summary || null,
             created_at: new Date().toISOString()
           }]);
           
         if (error) {
           console.error('Error saving search to history:', error);
+        } else {
+          console.log('Successfully saved paper with PDF link to history');
         }
       } catch (supabaseError) {
         console.error('Error saving search to Supabase:', supabaseError);
         // Don't throw the error, continue even if saving to history fails
       }
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      console.error('Error in processQuery:', err);
+      setError(err.message || 'Something went wrong while processing the query');
     } finally {
       setIsProcessing(false);
     }
@@ -194,6 +229,23 @@ export default function Dashboard() {
       return;
     }
     processQuery(query.trim());
+  };
+
+  const handleChatClick = async (paper: PaperResult) => {
+    const paperKey = paper.pdfUrl || paper.title;
+    setIsChatLoading(true);
+    setChatLoadingPaper(paperKey);
+    
+    try {
+      // Simulate a small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setChatPaper(paper);
+    } catch (error) {
+      console.error('Error opening chat:', error);
+    } finally {
+      setIsChatLoading(false);
+      setChatLoadingPaper(null);
+    }
   };
 
   const handleSave = (content: string, filename: string) => {
@@ -218,6 +270,69 @@ export default function Dashboard() {
     } catch {
       return dateString;
     }
+  };
+
+  // Function to render mathematical notation and markdown formatting properly
+  const renderMathText = (text: string) => {
+    if (!text) return text;
+    
+    // First handle Markdown formatting
+    let processedText = text
+      // Handle ##### smallest subheadings
+      .replace(/^##### (.+)$/gm, '<h6 class="text-sm font-semibold text-gray-800 mb-1 mt-2">$1</h6>')
+      // Handle #### subheadings
+      .replace(/^#### (.+)$/gm, '<h5 class="text-base font-semibold text-gray-800 mb-1 mt-2">$1</h5>')
+      // Handle ### subheadings
+      .replace(/^### (.+)$/gm, '<h4 class="text-lg font-semibold text-gray-800 mb-1 mt-3">$1</h4>')
+      // Handle ## headings
+      .replace(/^## (.+)$/gm, '<h3 class="text-xl font-semibold text-gray-800 mb-2 mt-4">$1</h3>')
+      // Handle # main headings
+      .replace(/^# (.+)$/gm, '<h2 class="text-2xl font-bold text-gray-800 mb-3 mt-5">$1</h2>')
+      // Handle **bold** text
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>');
+    
+    // Then handle mathematical notation
+    processedText = processedText.replace(/\$([^$]+)\$/g, (_, mathContent) => {
+      // Handle common mathematical notations
+      const formattedMath = mathContent
+        .replace(/\\log/g, 'log')
+        .replace(/\\n/g, 'n')
+        .replace(/O\(([^)]+)\)/g, (_: string, complexity: string) => {
+          return `<span class="math-function">O</span>(<span class="math-variable">${complexity}</span>)`;
+        })
+        // Handle other common math symbols
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\gamma/g, 'γ')
+        .replace(/\\delta/g, 'δ')
+        .replace(/\\epsilon/g, 'ε')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\sigma/g, 'σ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\sum/g, '∑')
+        .replace(/\\prod/g, '∏')
+        .replace(/\\int/g, '∫')
+        .replace(/\\partial/g, '∂')
+        .replace(/\\nabla/g, '∇')
+        .replace(/\\times/g, '×')
+        .replace(/\\cdot/g, '·')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\in/g, '∈')
+        .replace(/\\subset/g, '⊂')
+        .replace(/\\supset/g, '⊃')
+        .replace(/\\cup/g, '∪')
+        .replace(/\\cap/g, '∩');
+      
+      return `<span class="math-inline">${formattedMath}</span>`;
+    });
+    
+    return processedText;
   };
 
   // Handle file drop and selection
@@ -293,13 +408,12 @@ export default function Dashboard() {
         } catch (storageError) {
           console.warn('Storage operation failed, continuing without file storage:', storageError);
           // Continue with processing even if storage fails
-        }
-
-        // Create form data
+        }        // Create form data
         const formData = new FormData();
         formData.append('file', file);
           // Upload to backend
-        const response = await fetch('http://127.0.0.1:8000/upload-pdf', {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+        const response = await fetch(`${apiBaseUrl}/upload-pdf`, {
           method: 'POST',
           body: formData,
         });
@@ -333,12 +447,12 @@ export default function Dashboard() {
           const { error } = await supabase
             .from('papers')
             .insert([{
-              title: data.title || file.name,
+              title: data.title || file.name || null,
               authors: 'Uploaded by you',
               published: new Date().toISOString(),
-              pdf_link: publicUrl, // Use the public URL from Supabase Storage or fallback
+              pdf_link: publicUrl && publicUrl !== '#' ? publicUrl : null,
               bibtex: '',
-              summary: data.summary || 'No summary available',
+              summary: data.summary || null,
               created_at: new Date().toISOString()
             }]);
             
@@ -367,10 +481,10 @@ export default function Dashboard() {
         setUploadSuccess(null);
       }, 5000);    } catch (err: any) {
       console.error('Upload error:', err);
-      
-      // Provide more helpful error messages for common issues
+        // Provide more helpful error messages for common issues
       if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        setError('Cannot connect to server. Please check if the backend server is running at http://127.0.0.1:8000');
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+        setError(`Cannot connect to server. Please check if the backend server is running at ${apiBaseUrl}`);
       } else if (err.message?.includes('404')) {
         setError('Server endpoint not found. Please check if the backend server is running with the correct API endpoints.');
       } else {
@@ -515,8 +629,7 @@ export default function Dashboard() {
                     </>
                   )}                </button>
               </div>
-            </div>
-            {error && (
+            </div>            {error && (
               <div className="flex items-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
                 <AlertCircle className="w-5 h-5" />
                 <span>{error}</span>
@@ -524,7 +637,8 @@ export default function Dashboard() {
             )}
           </form>
         </div>        {results.length > 0 && (
-          <div className="space-y-8">            <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
+          <div id="results-section" className="space-y-8">
+            <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
               <CheckCircle className="w-5 h-5" />
               <span>Paper processed successfully! Summary available below and saved to your <Link to="/history" className="text-accent-600 hover:text-accent-700 underline">history</Link>.</span>
             </div>
@@ -536,44 +650,70 @@ export default function Dashboard() {
                     <h3 className="text-lg font-semibold text-white">Paper Information</h3>
                   </div>
                   <div className="p-6">
-                    <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
+                    <h4 
+                      className="text-xl font-bold text-gray-800 mb-4"
+                      dangerouslySetInnerHTML={{ __html: renderMathText(paper.title) }}
+                    ></h4>
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div className="flex items-center space-x-2 text-gray-600">
                         <Users className="w-4 h-4" />
                         <span className="text-sm">
-                          <strong>Authors:</strong> {paper.authors.join(', ') || 'Not available'}
+                          <strong>Authors:</strong> {paper.authors?.length > 0 ? paper.authors.join(', ') : 'Not available'}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 text-gray-600">
                         <Calendar className="w-4 h-4" />
                         <span className="text-sm">
-                          <strong>Published:</strong> {formatDate(paper.publishedDate)}
+                          <strong>Published:</strong> {paper.publishedDate ? formatDate(paper.publishedDate) : 'Not available'}
                         </span>
                       </div>
                     </div>
                     <div className="mb-4">
                       <h5 className="font-semibold text-gray-800 mb-2">Abstract:</h5>
-                      <p className="text-gray-600 leading-relaxed">{paper.abstract}</p>
+                      <p 
+                        className="text-gray-600 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: renderMathText(paper.abstract || 'No abstract available') }}
+                      ></p>
                     </div>
-                    <div className="flex space-x-4">
-                      <a
-                        href={paper.arxivUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors duration-200"
+                    <div className="flex flex-wrap gap-4">
+                      {paper.arxivUrl && paper.arxivUrl !== '#' && (
+                        <a
+                          href={paper.arxivUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors duration-200"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>View on ArXiv</span>
+                        </a>
+                      )}
+                      {paper.pdfUrl && paper.pdfUrl !== '' && (
+                        <a
+                          href={paper.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 text-purple-600 hover:text-purple-700 transition-colors duration-200"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>Download PDF</span>
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleChatClick(paper)}
+                        disabled={isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50"
                       >
-                        <ExternalLink className="w-4 h-4" />
-                        <span>View on ArXiv</span>
-                      </a>
-                      <a
-                        href={paper.pdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 text-purple-600 hover:text-purple-700 transition-colors duration-200"
-                      >
-                        <FileText className="w-4 h-4" />
-                        <span>Download PDF</span>
-                      </a>
+                        {isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            💬 <span>Chat</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -592,12 +732,16 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="p-6">
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.summary}</p>
+                    <p 
+                      className="text-gray-600 leading-relaxed whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: renderMathText(paper.summary || 'No summary available') }}
+                    ></p>
                   </div>
                 </div>
               </div>
             ))}
-          </div>        )}
+          </div>
+        )}
 
         {/* Upload Section - Show when button is clicked */}
         {showUploadSection && (
@@ -809,7 +953,10 @@ export default function Dashboard() {
                       <h3 className="text-lg font-semibold text-white">Paper Information</h3>
                     </div>
                     <div className="p-6">
-                      <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
+                      <h4 
+                        className="text-xl font-bold text-gray-800 mb-4"
+                        dangerouslySetInnerHTML={{ __html: renderMathText(paper.title) }}
+                      ></h4>
                       <div className="grid md:grid-cols-2 gap-4 mb-4">
                         <div className="flex items-center space-x-2 text-gray-600">
                           <Users className="w-4 h-4" />
@@ -831,116 +978,264 @@ export default function Dashboard() {
                     <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-white">AI Summary</h3>
-                        <button
-                          onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
-                          className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Save</span>
-                        </button>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => handleChatClick(paper)}
+                            disabled={isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title)}
+                            className="flex items-center space-x-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors duration-200 disabled:opacity-50"
+                          >
+                            {isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title) ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                💬 <span>Chat</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
+                            className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span>Save</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="p-6">
-                      <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.summary}</p>
+                      <p 
+                        className="text-gray-600 leading-relaxed whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{ __html: renderMathText(paper.summary) }}
+                      ></p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        )}
-
-        {/* All Papers Section - Always visible */}
+        )}        {/* All Papers Section - Always visible */}
         <div className="relative bg-gradient-to-br from-secondary-50/90 to-accent-50/80 rounded-3xl shadow-card p-8 mb-8 border border-white/40 overflow-hidden">
           <div className="absolute inset-0 bg-white/40 backdrop-blur-sm -z-10"></div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-400 via-accent-400 to-secondary-400"></div>
           
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center">
-              <div className="p-2 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl mr-3">
-                <FileText className="w-6 h-6 text-accent-600" />
-              </div>
-              <h3 className="text-2xl font-display font-bold text-gray-800">Research Papers</h3>
+          <div className="flex items-center mb-6">
+            <div className="p-2 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl mr-3">
+              <BookOpen className="w-6 h-6 text-accent-600" />
+            </div>
+            <h3 className="text-2xl font-display font-bold text-gray-800">Research Papers</h3>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6 p-4 bg-white/60 rounded-xl border border-gray-200">
+            <div className="flex-1">
+              <label htmlFor="category-select" className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>              <select
+                id="category-select"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="cs.AI">Computer Science - AI</option>
+                <option value="cs.LG">Computer Science - Machine Learning</option>
+                <option value="cs.CV">Computer Science - Computer Vision</option>
+                <option value="cs.CL">Computer Science - Computation and Language</option>
+                <option value="physics.gen-ph">Physics - General Physics</option>
+                <option value="math.NA">Mathematics - Numerical Analysis</option>
+                <option value="stat.ML">Statistics - Machine Learning</option>
+              </select>
             </div>
             
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500 mr-2">Found {allPapers.length} papers</span>
+            <div className="flex-1">
+              <label htmlFor="max-results" className="block text-sm font-medium text-gray-700 mb-2">
+                Papers per page
+              </label>
+              <select
+                id="max-results"
+                value={maxResults}
+                onChange={(e) => setMaxResults(parseInt(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value={10}>10 papers</option>
+                <option value={20}>20 papers</option>
+                <option value={50}>50 papers</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <span className="text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
+                Found {allPapers.length} papers
+              </span>
             </div>
           </div>
-          
-          <div className="space-y-4">
-            {allPapers.map((paper, index) => (
-              <div 
-                key={index} 
-                className="group bg-white/90 backdrop-blur-sm rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-300 p-5 border border-gray-100 hover:border-accent-200 relative overflow-hidden"
+
+          {/* Pagination Controls */}
+          {allPapers.length >= maxResults && (
+            <div className="flex justify-between items-center mb-6 p-3 bg-white/60 rounded-lg">
+              <button
+                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0 || isLoadingAllPapers}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
-                <div className="flex flex-col md:flex-row gap-4">
-                  {/* Paper content */}
-                  <div className="flex-1">
-                    <h4 className="text-lg font-semibold text-secondary-700 group-hover:text-accent-700 transition-colors duration-300 mb-2 pr-4">
-                      <a href={paper.arxivUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                        {paper.title}
-                      </a>
-                    </h4>
-                    
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                      <span className="text-sm text-gray-600">By:</span>
-                      <p className="text-sm text-gray-500 line-clamp-1">
-                        {paper.authors.slice(0, 3).join(', ')}{paper.authors.length > 3 ? ', et al.' : ''}
-                      </p>
-                      <span className="text-gray-400">•</span>
-                      <p className="text-xs bg-secondary-100 text-secondary-700 px-2 py-1 rounded-full">
-                        {formatDate(paper.publishedDate).split(' ').slice(-1)[0]} {/* Just show the year */}
-                      </p>
+                Previous
+              </button>
+              
+              <span className="text-sm text-gray-600">
+                Page {currentPage + 1} (showing {currentPage * maxResults + 1}-{Math.min((currentPage + 1) * maxResults, allPapers.length)} of {allPapers.length})
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={allPapers.length < maxResults || isLoadingAllPapers}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                Next
+              </button>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoadingAllPapers && (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center space-x-3">
+                <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                <span className="text-gray-600">Loading papers from arXiv...</span>
+              </div>
+            </div>
+          )}
+            <div className="space-y-4">            {allPapers.map((paper, index) => {
+              // Use PDF URL as primary cache key, fallback to title
+              const cacheKey = (paper.pdfUrl && paper.pdfUrl !== '' && paper.pdfUrl !== '#') ? paper.pdfUrl : paper.title;
+              const isProcessed = processedPapers.has(cacheKey);
+              
+              return (
+                <div 
+                  key={index} 
+                  className={`group bg-white/90 backdrop-blur-sm rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-300 p-5 border relative overflow-hidden ${
+                    isProcessed ? 'border-green-200 bg-green-50/50' : 'border-gray-100 hover:border-accent-200'
+                  }`}
+                >
+                  
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Paper content */}
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-secondary-700 group-hover:text-accent-700 transition-colors duration-300 mb-2 pr-16">
+                        <a 
+                          href={paper.arxivUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="hover:underline"
+                          dangerouslySetInnerHTML={{ __html: renderMathText(paper.title) }}
+                        ></a>
+                      </h4>
+                      
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span className="text-sm text-gray-600">By:</span>
+                        <p className="text-sm text-gray-500 line-clamp-1">
+                          {paper.authors.slice(0, 3).join(', ')}{paper.authors.length > 3 ? ', et al.' : ''}
+                        </p>
+                        <span className="text-gray-400">•</span>
+                        <p className="text-xs bg-secondary-100 text-secondary-700 px-2 py-1 rounded-full">
+                          {formatDate(paper.publishedDate).split(' ').slice(-1)[0]} {/* Just show the year */}
+                        </p>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <p 
+                          className="text-sm text-gray-600 line-clamp-2"
+                          dangerouslySetInnerHTML={{ __html: renderMathText(paper.abstract) }}
+                        ></p>
+                      </div>
                     </div>
                     
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {paper.abstract}
-                      </p>
+                    {/* Actions */}
+                    <div className="flex md:flex-col gap-2 justify-end md:min-w-[140px]">
+                      <button
+                        onClick={() => handleChatClick(paper)}
+                        disabled={isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title)}
+                        className="w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg disabled:opacity-50"
+                        style={{ marginBottom: 8 }}
+                      >
+                        {isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            💬 Chat
+                          </>
+                        )}
+                      </button>
+                      <button 
+                        onClick={() => processQuery(paper.pdfUrl, paper.pdfUrl, paper)}
+                        disabled={isProcessing}
+                        className={`w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 ${
+                          isProcessed 
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                            : 'bg-gradient-to-r from-accent-500 to-accent-600 text-white hover:shadow-purple-glow'
+                        }`}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Processing...</span>
+                          </>
+                        ) : isProcessed ? (
+                          <>
+                            <Eye className="w-4 h-4" />
+                            <span>View Summary</span>
+                          </>
+                        ) : (
+                          <>
+                            <Search className="w-4 h-4" />
+                            <span>Summarize PDF</span>
+                          </>
+                        )}
+                      </button>
+                      <div className="flex gap-2 w-full">
+                        <a 
+                          href={paper.arxivUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-xs bg-secondary-100 text-secondary-700 hover:bg-secondary-200 rounded-xl transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>ArXiv</span>
+                        </a>
+                        <a 
+                          href={paper.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-xs bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-xl transition-colors"
+                        >
+                          <FileText className="w-3 h-3" />
+                          <span>PDF</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
                   
-                  {/* Actions */}
-                  <div className="flex md:flex-col gap-2 justify-end md:min-w-[140px]">
-                    <button 
-                      onClick={() => processQuery(paper.title)}
-                      className="w-full py-2 px-3 bg-gradient-to-r from-accent-500 to-accent-600 text-white text-sm font-medium rounded-xl hover:shadow-purple-glow transition-all duration-200 flex items-center justify-center gap-2"
-                    >
-                      <Search className="w-4 h-4" />
-                      <span>Get Summary</span>
-                    </button>
-                    
-                    <div className="flex gap-2 w-full">
-                      <a 
-                        href={paper.arxivUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-xs bg-secondary-100 text-secondary-700 hover:bg-secondary-200 rounded-xl transition-colors"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        <span>ArXiv</span>
-                      </a>
-                      <a 
-                        href={paper.pdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-xs bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-xl transition-colors"
-                      >
-                        <FileText className="w-3 h-3" />
-                        <span>PDF</span>
-                      </a>
-                    </div>
-                  </div>
+                  {/* Hover effect highlight */}
+                  <div className={`absolute inset-x-0 bottom-0 h-1 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ${
+                    isProcessed 
+                      ? 'bg-gradient-to-r from-green-400 via-green-500 to-green-600' 
+                      : 'bg-gradient-to-r from-primary-400 via-accent-500 to-secondary-400'
+                  }`}></div>
                 </div>
-                
-                {/* Hover effect highlight */}
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-primary-400 via-accent-500 to-secondary-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
+
+      {/* Chat Modal - Show when a paper card's chat button is clicked */}
+      {chatPaper && (
+        <PaperRAGChatModal paper={chatPaper} onClose={() => setChatPaper(null)} />
+      )}
     </div>
   );
 }

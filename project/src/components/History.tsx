@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { ArrowLeft, ExternalLink, Clipboard, Loader2, Trash2, AlertCircle, History as HistoryIcon, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Trash2, AlertCircle, History as HistoryIcon, Upload } from 'lucide-react';
 
 interface Paper {
   id: string;
@@ -161,6 +161,30 @@ export function History() {
   // Function to truncate text
   const truncateText = (text: string, maxLength: number) => {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
+  // Function to format text with markdown headers and basic formatting
+  const formatText = (text: string) => {
+    if (!text) return text;
+    
+    // Handle Markdown headers
+    return text
+      // Handle ##### smallest subheadings
+      .replace(/^##### (.+)$/gm, '<h6 class="text-sm font-semibold text-gray-800 mb-1 mt-2">$1</h6>')
+      // Handle #### subheadings
+      .replace(/^#### (.+)$/gm, '<h5 class="text-base font-semibold text-gray-800 mb-1 mt-2">$1</h5>')
+      // Handle ### subheadings
+      .replace(/^### (.+)$/gm, '<h4 class="text-lg font-semibold text-gray-800 mb-1 mt-3">$1</h4>')
+      // Handle ## headings
+      .replace(/^## (.+)$/gm, '<h3 class="text-xl font-semibold text-gray-800 mb-2 mt-4">$1</h3>')
+      // Handle # main headings
+      .replace(/^# (.+)$/gm, '<h2 class="text-2xl font-bold text-gray-800 mb-3 mt-5">$1</h2>')
+      // Handle **bold** text
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>')
+      // Handle *italic* text
+      .replace(/\*([^*]+)\*/g, '<em class="italic text-gray-700">$1</em>')
+      // Handle line breaks
+      .replace(/\n/g, '<br/>');
   };
 
   return (
@@ -366,18 +390,6 @@ export function History() {
                             <span className="text-xs">View PDF</span>
                           </button>
                           <button
-                            className="flex items-center justify-center px-2 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-all duration-200 hover:shadow-soft"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(paper.bibtex);
-                              alert('BibTeX copied to clipboard!');
-                            }}
-                            title="Copy BibTeX"
-                          >
-                            <Clipboard className="w-4 h-4 mr-1" />
-                            <span className="text-xs">BibTeX</span>
-                          </button>
-                          <button
                             className="flex items-center justify-center px-2 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 hover:shadow-soft"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -428,9 +440,10 @@ export function History() {
                               <div className="w-1 h-6 bg-gradient-to-b from-accent-400 to-accent-600 rounded-full mr-2"></div>
                               <p className="font-medium text-gray-800">Paper Summary</p>
                             </div>
-                            <p className="text-gray-600 leading-relaxed bg-white/80 backdrop-blur-sm p-5 rounded-xl shadow-soft border border-white/70">
-                              {paper.summary}
-                            </p>
+                            <p 
+                              className="text-gray-600 leading-relaxed bg-white/80 backdrop-blur-sm p-5 rounded-xl shadow-soft border border-white/70"
+                              dangerouslySetInnerHTML={{ __html: formatText(paper.summary) }}
+                            />
                           </div>
                         </td>
                       </tr>

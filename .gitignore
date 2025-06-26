@@ -1,2 +1,86 @@
+# Node/Frontend
 node_modules/
-.env
+.bolt/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+/build
+/dist
+*.tsbuildinfo
+
+# React/Vite/Next
+*.local
+.next/
+out/
+
+# Mac/OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Others
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.rej
+*.backup
+*.old
+*.save
+
+# Python/Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+ENV/
+VENV/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pot
+*.db
+*.sqlite3
+*.tar.gz
+*.whl
+*.zip
+*.env
+*.venv
+
+# Jupyter
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# Supabase
+.supabase/
+
+# Project-specific
+project/.env
+project/node_modules/
+project/dist/
+project/build/
+project/.next/
+project/out/
+project/.local
+project/.DS_Store
+project/*.log
+project/pnpm-lock.yaml
+project/package-lock.json
+project/server/*.log
+backend/__pycache__/
+backend/venv/
+backend/.env
+backend/.env.*
+backend/.DS_Store
+backend/*.log
+backend/test_req/
