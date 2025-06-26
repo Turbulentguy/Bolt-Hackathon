@@ -699,7 +699,50 @@ def fetch_papers_by_category(categories, max_results_per_category=10):
         "categories": categories
     }
 
-def summarize_from_pdf_url(pdf_url: str):
+def extract_pdf_title(reader, fallback_text=None):
+    # Try PDF metadata
+    if reader.metadata and getattr(reader.metadata, 'title', None):
+        meta_title = reader.metadata.title
+        if meta_title and meta_title.strip() and meta_title.lower() != 'untitled':
+            return meta_title.strip()
+    # Try first page (look for a line in quotes or a likely title)
+    if reader.pages:
+        try:
+            first_page = reader.pages[0]
+            text = first_page.extract_text()
+            if text:
+                lines = [line.strip() for line in text.split('\n') if line.strip()]
+                # Heuristic 0: line like 'The research paper titled "..." ...'
+                for line in lines:
+                    if line.lower().startswith('the research paper titled') and '"' in line:
+                        import re
+                        match = re.search(r'the research paper titled ["\']([^"\']{10,})["\']', line, re.IGNORECASE)
+                        if match:
+                            return match.group(1)
+                # Heuristic 1: line in quotes
+                for line in lines:
+                    if (line.startswith('"') and line.endswith('"') or line.startswith("'") and line.endswith("'")) and len(line) > 10:
+                        return line.strip('"').strip("'")
+                # Heuristic 2: line with Title Case and >10 chars
+                for line in lines:
+                    if len(line) > 10 and sum(1 for w in line.split() if w.istitle()) > 1:
+                        return line
+                # Fallback: first non-empty line
+                for line in lines:
+                    if len(line) > 8 and not line.lower().startswith('arxiv'):
+                        return line
+        except Exception:
+            pass
+    # Try fallback_text (e.g. abstract/summary)
+    if fallback_text:
+        import re
+        # Look for The research paper titled "..." or '...'
+        match = re.search(r'the research paper titled ["\']([^"\']{10,})["\']', fallback_text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
+
+def summarize_from_pdf_url(pdf_url: str, abstract_text=None):
     """
     Directly summarize a PDF from a given URL
     """
@@ -772,18 +815,19 @@ def summarize_from_pdf_url(pdf_url: str):
                 print("[WARNING] Very little text extracted, might be image-based PDF")
                 return {"error": "Very little text could be extracted. The PDF might be image-based."}
                 
-            # Generate summary
+            # --- Title extraction logic ---
+            title = extract_pdf_title(reader, fallback_text=summary if 'summary' in locals() else None)
+            if not title:
+                # Try to extract arXiv ID from URL as fallback
+                if 'arxiv.org' in pdf_url:
+                    import re
+                    arxiv_match = re.search(r'([0-9]{4}\.[0-9]{4,5})', pdf_url)
+                    if arxiv_match:
+                        title = f"arXiv:{arxiv_match.group(1)}"
+                if not title:
+                    title = "PDF Document"
+            # --- End title extraction ---
             summary = summarize_text_with_gpt(text)
-            
-            # Extract title from URL or use generic title
-            title = "PDF Document"
-            if 'arxiv.org' in pdf_url:
-                # Extract arXiv ID from URL
-                import re
-                arxiv_match = re.search(r'([0-9]{4}\.[0-9]{4,5})', pdf_url)
-                if arxiv_match:
-                    title = f"arXiv:{arxiv_match.group(1)}"
-            
             result = {
                 "title": title,
                 "authors": "N/A",  # Cannot extract authors from PDF URL alone
@@ -792,14 +836,11 @@ def summarize_from_pdf_url(pdf_url: str):
                 "bibtex": f"@article{{pdf_summary,\n  title={{ {title} }},\n  url={{ {pdf_url} }}\n}}",
                 "summary": summary
             }
-            
             print(f"[INFO] Successfully processed PDF from URL")
             return result
-            
         except Exception as pdf_error:
             print(f"[ERROR] PDF processing failed: {pdf_error}")
             return {"error": f"PDF processing failed: {str(pdf_error)}"}
-            
     except Exception as e:
         print(f"[ERROR] Unexpected exception in summarize_from_pdf_url: {e}")
         return {"error": f"Internal server error: {str(e)}"}

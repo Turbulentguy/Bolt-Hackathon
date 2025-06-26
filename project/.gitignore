@@ -115,3 +115,7 @@ docker-compose.override.yml
 
 # System
 lost+found/
+
+# Ensure backend is not ignored
+!server/
+!backend/

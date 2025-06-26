@@ -5,6 +5,7 @@ from service import fetch_and_summarize, process_uploaded_pdf, fetch_all_arxiv_p
 from supabase import create_client
 from supabase_config import SUPABASE_URL, SUPABASE_KEY
 import io
+from chatbot_rag import chatbot_router
 
 app = FastAPI()
 
@@ -389,3 +390,6 @@ def get_recent_papers(days: int = Query(7, description="จำนวนวัน
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching recent papers: {str(e)}")
+
+# Include the chatbot router
+app.include_router(chatbot_router, prefix="/api")
