@@ -19,6 +19,7 @@ import {
 import { ArxivApiService } from '../utils/api-service';
 import { supabase } from '../supabase';
 import PaperRAGChat from '../../PaperRAGChat';
+import BoltBadge from './BoltBadge';
 
 interface Paper {
   id: string;
@@ -214,6 +215,14 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Bolt Badge - responsive sizing */}
+              <div className="hidden sm:block">
+                <BoltBadge variant="light" size="md" />
+              </div>
+              <div className="block sm:hidden">
+                <BoltBadge variant="light" size="sm" />
+              </div>
+              
               <Link
                 to="/history"
                 className="flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl shadow-soft hover:shadow-card transition-all duration-200"

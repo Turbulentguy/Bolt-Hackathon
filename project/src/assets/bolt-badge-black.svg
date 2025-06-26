@@ -1,0 +1,22 @@
+<svg width="360" height="360" viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black circle background -->
+  <circle cx="180" cy="180" r="180" fill="black"/>
+  
+  <!-- Circular text path -->
+  <defs>
+    <path id="circle" d="M 180, 180 m -140, 0 a 140,140 0 1,1 280,0 a 140,140 0 1,1 -280,0"/>
+  </defs>
+  
+  <!-- Text around the circle -->
+  <text font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white" letter-spacing="3">
+    <textPath href="#circle" startOffset="0%">
+      POWERED BY BOLT.NEW MADE IN BOLT.NEW
+    </textPath>
+  </text>
+  
+  <!-- Central "b" logo -->
+  <g transform="translate(180,180)">
+    <!-- Stylized "b" letter -->
+    <path d="M-25,-60 L-25,60 L-10,60 L-10,5 L10,5 C25,5 35,-5 35,-20 C35,-35 25,-45 10,-45 L-25,-45 Z M-10,-30 L10,-30 C15,-30 20,-25 20,-20 C20,-15 15,-10 10,-10 L-10,-10 Z M-10,20 L15,20 C25,20 35,30 35,45 C35,60 25,70 15,70 L-25,70 L-25,55 L15,55 C20,55 25,50 25,45 C25,40 20,35 15,35 L-10,35 Z" fill="white"/>
+  </g>
+</svg>
