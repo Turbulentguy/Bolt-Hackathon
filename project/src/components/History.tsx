@@ -163,6 +163,30 @@ export function History() {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
+  // Function to format text with markdown headers and basic formatting
+  const formatText = (text: string) => {
+    if (!text) return text;
+    
+    // Handle Markdown headers
+    return text
+      // Handle ##### smallest subheadings
+      .replace(/^##### (.+)$/gm, '<h6 class="text-sm font-semibold text-gray-800 mb-1 mt-2">$1</h6>')
+      // Handle #### subheadings
+      .replace(/^#### (.+)$/gm, '<h5 class="text-base font-semibold text-gray-800 mb-1 mt-2">$1</h5>')
+      // Handle ### subheadings
+      .replace(/^### (.+)$/gm, '<h4 class="text-lg font-semibold text-gray-800 mb-1 mt-3">$1</h4>')
+      // Handle ## headings
+      .replace(/^## (.+)$/gm, '<h3 class="text-xl font-semibold text-gray-800 mb-2 mt-4">$1</h3>')
+      // Handle # main headings
+      .replace(/^# (.+)$/gm, '<h2 class="text-2xl font-bold text-gray-800 mb-3 mt-5">$1</h2>')
+      // Handle **bold** text
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>')
+      // Handle *italic* text
+      .replace(/\*([^*]+)\*/g, '<em class="italic text-gray-700">$1</em>')
+      // Handle line breaks
+      .replace(/\n/g, '<br/>');
+  };
+
   return (
     <div className="min-h-screen">      <header className="bg-glass sticky top-0 z-10 border-b border-white/30 shadow-soft">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -428,9 +452,10 @@ export function History() {
                               <div className="w-1 h-6 bg-gradient-to-b from-accent-400 to-accent-600 rounded-full mr-2"></div>
                               <p className="font-medium text-gray-800">Paper Summary</p>
                             </div>
-                            <p className="text-gray-600 leading-relaxed bg-white/80 backdrop-blur-sm p-5 rounded-xl shadow-soft border border-white/70">
-                              {paper.summary}
-                            </p>
+                            <p 
+                              className="text-gray-600 leading-relaxed bg-white/80 backdrop-blur-sm p-5 rounded-xl shadow-soft border border-white/70"
+                              dangerouslySetInnerHTML={{ __html: formatText(paper.summary) }}
+                            />
                           </div>
                         </td>
                       </tr>

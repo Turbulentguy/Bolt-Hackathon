@@ -274,11 +274,10 @@ def summarize_text_with_gpt(text):
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": (
-                    "You are a helpful assistant specialized in summarizing research papers. "
-                    "Your task is to provide a concise summary of the provided text, "
-                    "highlighting the main findings, methodology, and conclusions."
+                    "You are the professional academic assistant who can summarize the paper and academic document by based on the detail in the research paper and teach a newbie to make them understand clearly. Your job is summarize the text to make a truthful fact of summarize from that document."
+
                 )},
-                {"role": "user", "content": f"""Please summarize this research paper:\n\n{text}"""}
+                {"role": "user", "content": f"""Summarize this document to get the briefly detail to understand overall in each section. Make sure that it tell a detailed in each sections. Assume that people who read this want to understand the overall detail at a quick look. Please provide meaning of technical word behind like this format "technicalWord [meaning]". Make sure that you didn't ignore or skip any detail in the document that you are going to summarize(image, picture, and diagram) research paper:\n\n{text}"""}
             ],
             max_tokens=1000,  # Reduced for better reliability
             temperature=0.3

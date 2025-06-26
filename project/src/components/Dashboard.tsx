@@ -12,7 +12,8 @@ import {
   RefreshCw, BookOpen
 } from 'lucide-react';
 import DiscordCanary from '../assets/Discord_Canary.png';
-import PaperRAGChatModal from "./PaperRAGChatModal";
+// @ts-ignore
+import PaperRAGChatModal from "./PaperRAGChatModal.jsx";
 
 interface PaperResult {
   title: string;
@@ -50,6 +51,8 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(0);
   const [maxResults, setMaxResults] = useState(20);
   const [chatPaper, setChatPaper] = useState<PaperResult|null>(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatLoadingPaper, setChatLoadingPaper] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Load all papers from API
   const loadAllPapersFromAPI = async () => {
@@ -75,7 +78,7 @@ export default function Dashboard() {
           abstract: paper.abstract || 'No abstract available',
           pdfUrl: paper.pdf_link || '',
           arxivUrl: paper.arxiv_url || '#',
-          publishedDate: paper.published || '',
+          publishedDate: (paper.published && paper.published !== 'N/A') ? paper.published : '',
           fullText: paper.abstract || 'No content available',
           summary: paper.abstract || 'No summary available'
         }));
@@ -144,6 +147,13 @@ export default function Dashboard() {
         const cachedPaper = processedPapers.get(cacheKey)!;
         setResults([cachedPaper]);
         setIsProcessing(false);
+        // Scroll to results section when viewing cached summary
+        setTimeout(() => {
+          const resultsSection = document.getElementById('results-section');
+          if (resultsSection) {
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
         return;
       }
       // If we have an existing PDF URL, use it for summarization directly
@@ -155,11 +165,14 @@ export default function Dashboard() {
       // Use the originalPaper's title if provided, else fallback to API or searchQuery
       const paper: PaperResult = {
         title: (originalPaper && originalPaper.title) || data.title || searchQuery || 'No title',
-        authors: data.authors ? (typeof data.authors === 'string' ? data.authors.split(',').map((a: string) => a.trim()) : data.authors) : ['Unknown authors'],
-        abstract: data.abstract || data.summary || 'No abstract available',
+        authors: (originalPaper && originalPaper.authors) || 
+                 (data.authors ? (typeof data.authors === 'string' ? data.authors.split(',').map((a: string) => a.trim()) : data.authors) : ['Unknown authors']),
+        abstract: (originalPaper && originalPaper.abstract) || data.abstract || data.summary || 'No abstract available',
         pdfUrl: data.pdf_link || existingPdfUrl || '',
         arxivUrl: data.arxiv_url || (data.pdf_link ? data.pdf_link.replace('/pdf/', '/abs/') : '#'),
-        publishedDate: data.published || (originalPaper && originalPaper.publishedDate) || new Date().toISOString(),
+        publishedDate: ((originalPaper && originalPaper.publishedDate && originalPaper.publishedDate !== 'N/A') ? originalPaper.publishedDate : null) || 
+                       ((data.published && data.published !== 'N/A') ? data.published : null) || 
+                       new Date().toISOString(),
         fullText: data.summary || data.abstract || 'No content available',
         summary: data.summary || 'No summary available'
       };
@@ -170,17 +183,25 @@ export default function Dashboard() {
       setProcessedPapers(prev => new Map(prev.set(cacheKey, paper)));
       setResults([paper]);
 
+      // Scroll to results section after processing
+      setTimeout(() => {
+        const resultsSection = document.getElementById('results-section');
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+
       // Save to Supabase for history with PDF link
       try {
         const { error } = await supabase
           .from('papers')
           .insert([{
-            title: paper.title,
-            authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors,
-            published: paper.publishedDate,
-            pdf_link: paper.pdfUrl,
+            title: paper.title || null,
+            authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : (paper.authors || null),
+            published: (paper.publishedDate && paper.publishedDate !== 'N/A') ? paper.publishedDate : null,
+            pdf_link: paper.pdfUrl || null,
             bibtex: '',
-            summary: paper.summary,
+            summary: paper.summary || null,
             created_at: new Date().toISOString()
           }]);
           
@@ -210,6 +231,23 @@ export default function Dashboard() {
     processQuery(query.trim());
   };
 
+  const handleChatClick = async (paper: PaperResult) => {
+    const paperKey = paper.pdfUrl || paper.title;
+    setIsChatLoading(true);
+    setChatLoadingPaper(paperKey);
+    
+    try {
+      // Simulate a small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setChatPaper(paper);
+    } catch (error) {
+      console.error('Error opening chat:', error);
+    } finally {
+      setIsChatLoading(false);
+      setChatLoadingPaper(null);
+    }
+  };
+
   const handleSave = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -232,6 +270,69 @@ export default function Dashboard() {
     } catch {
       return dateString;
     }
+  };
+
+  // Function to render mathematical notation and markdown formatting properly
+  const renderMathText = (text: string) => {
+    if (!text) return text;
+    
+    // First handle Markdown formatting
+    let processedText = text
+      // Handle ##### smallest subheadings
+      .replace(/^##### (.+)$/gm, '<h6 class="text-sm font-semibold text-gray-800 mb-1 mt-2">$1</h6>')
+      // Handle #### subheadings
+      .replace(/^#### (.+)$/gm, '<h5 class="text-base font-semibold text-gray-800 mb-1 mt-2">$1</h5>')
+      // Handle ### subheadings
+      .replace(/^### (.+)$/gm, '<h4 class="text-lg font-semibold text-gray-800 mb-1 mt-3">$1</h4>')
+      // Handle ## headings
+      .replace(/^## (.+)$/gm, '<h3 class="text-xl font-semibold text-gray-800 mb-2 mt-4">$1</h3>')
+      // Handle # main headings
+      .replace(/^# (.+)$/gm, '<h2 class="text-2xl font-bold text-gray-800 mb-3 mt-5">$1</h2>')
+      // Handle **bold** text
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>');
+    
+    // Then handle mathematical notation
+    processedText = processedText.replace(/\$([^$]+)\$/g, (_, mathContent) => {
+      // Handle common mathematical notations
+      const formattedMath = mathContent
+        .replace(/\\log/g, 'log')
+        .replace(/\\n/g, 'n')
+        .replace(/O\(([^)]+)\)/g, (_: string, complexity: string) => {
+          return `<span class="math-function">O</span>(<span class="math-variable">${complexity}</span>)`;
+        })
+        // Handle other common math symbols
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\gamma/g, 'γ')
+        .replace(/\\delta/g, 'δ')
+        .replace(/\\epsilon/g, 'ε')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\sigma/g, 'σ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\sum/g, '∑')
+        .replace(/\\prod/g, '∏')
+        .replace(/\\int/g, '∫')
+        .replace(/\\partial/g, '∂')
+        .replace(/\\nabla/g, '∇')
+        .replace(/\\times/g, '×')
+        .replace(/\\cdot/g, '·')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\in/g, '∈')
+        .replace(/\\subset/g, '⊂')
+        .replace(/\\supset/g, '⊃')
+        .replace(/\\cup/g, '∪')
+        .replace(/\\cap/g, '∩');
+      
+      return `<span class="math-inline">${formattedMath}</span>`;
+    });
+    
+    return processedText;
   };
 
   // Handle file drop and selection
@@ -346,12 +447,12 @@ export default function Dashboard() {
           const { error } = await supabase
             .from('papers')
             .insert([{
-              title: data.title || file.name,
+              title: data.title || file.name || null,
               authors: 'Uploaded by you',
               published: new Date().toISOString(),
-              pdf_link: publicUrl, // Use the public URL from Supabase Storage or fallback
+              pdf_link: publicUrl && publicUrl !== '#' ? publicUrl : null,
               bibtex: '',
-              summary: data.summary || 'No summary available',
+              summary: data.summary || null,
               created_at: new Date().toISOString()
             }]);
             
@@ -544,7 +645,7 @@ export default function Dashboard() {
             )}
           </form>
         </div>        {results.length > 0 && (
-          <div className="space-y-8">
+          <div id="results-section" className="space-y-8">
             <div className="flex items-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-xl p-3">
               <CheckCircle className="w-5 h-5" />
               <span>Paper processed successfully! Summary available below and saved to your <Link to="/history" className="text-accent-600 hover:text-accent-700 underline">history</Link>.</span>
@@ -557,7 +658,10 @@ export default function Dashboard() {
                     <h3 className="text-lg font-semibold text-white">Paper Information</h3>
                   </div>
                   <div className="p-6">
-                    <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
+                    <h4 
+                      className="text-xl font-bold text-gray-800 mb-4"
+                      dangerouslySetInnerHTML={{ __html: renderMathText(paper.title) }}
+                    ></h4>
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div className="flex items-center space-x-2 text-gray-600">
                         <Users className="w-4 h-4" />
@@ -574,7 +678,10 @@ export default function Dashboard() {
                     </div>
                     <div className="mb-4">
                       <h5 className="font-semibold text-gray-800 mb-2">Abstract:</h5>
-                      <p className="text-gray-600 leading-relaxed">{paper.abstract || 'No abstract available'}</p>
+                      <p 
+                        className="text-gray-600 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: renderMathText(paper.abstract || 'No abstract available') }}
+                      ></p>
                     </div>
                     <div className="flex space-x-4">
                       {paper.arxivUrl && paper.arxivUrl !== '#' && (
@@ -617,7 +724,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="p-6">
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.summary || 'No summary available'}</p>
+                    <p 
+                      className="text-gray-600 leading-relaxed whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: renderMathText(paper.summary || 'No summary available') }}
+                    ></p>
                   </div>
                 </div>
               </div>
@@ -835,7 +945,10 @@ export default function Dashboard() {
                       <h3 className="text-lg font-semibold text-white">Paper Information</h3>
                     </div>
                     <div className="p-6">
-                      <h4 className="text-xl font-bold text-gray-800 mb-4">{paper.title}</h4>
+                      <h4 
+                        className="text-xl font-bold text-gray-800 mb-4"
+                        dangerouslySetInnerHTML={{ __html: renderMathText(paper.title) }}
+                      ></h4>
                       <div className="grid md:grid-cols-2 gap-4 mb-4">
                         <div className="flex items-center space-x-2 text-gray-600">
                           <Users className="w-4 h-4" />
@@ -857,17 +970,38 @@ export default function Dashboard() {
                     <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-white">AI Summary</h3>
-                        <button
-                          onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
-                          className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Save</span>
-                        </button>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => handleChatClick(paper)}
+                            disabled={isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title)}
+                            className="flex items-center space-x-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors duration-200 disabled:opacity-50"
+                          >
+                            {isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title) ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                💬 <span>Chat</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleSave(paper.summary, `${paper.title.replace(/[^a-zA-Z0-9]/g, '_')}_summary`)}
+                            className="flex items-center space-x-2 text-white/90 hover:text-white transition-colors duration-200"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span>Save</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="p-6">
-                      <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{paper.summary}</p>
+                      <p 
+                        className="text-gray-600 leading-relaxed whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{ __html: renderMathText(paper.summary) }}
+                      ></p>
                     </div>
                   </div>
                 </div>
@@ -989,22 +1123,18 @@ export default function Dashboard() {
                     isProcessed ? 'border-green-200 bg-green-50/50' : 'border-gray-100 hover:border-accent-200'
                   }`}
                 >
-                  {isProcessed && (
-                    <div className="absolute top-3 right-3">
-                      <div className="flex items-center space-x-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
-                        <CheckCircle className="w-3 h-3" />
-                        <span>Processed</span>
-                      </div>
-                    </div>
-                  )}
                   
                   <div className="flex flex-col md:flex-row gap-4">
                     {/* Paper content */}
                     <div className="flex-1">
                       <h4 className="text-lg font-semibold text-secondary-700 group-hover:text-accent-700 transition-colors duration-300 mb-2 pr-16">
-                        <a href={paper.arxivUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                          {paper.title}
-                        </a>
+                        <a 
+                          href={paper.arxivUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="hover:underline"
+                          dangerouslySetInnerHTML={{ __html: renderMathText(paper.title) }}
+                        ></a>
                       </h4>
                       
                       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -1019,20 +1149,31 @@ export default function Dashboard() {
                       </div>
                       
                       <div className="mb-3">
-                        <p className="text-sm text-gray-600 line-clamp-2">
-                          {paper.abstract}
-                        </p>
+                        <p 
+                          className="text-sm text-gray-600 line-clamp-2"
+                          dangerouslySetInnerHTML={{ __html: renderMathText(paper.abstract) }}
+                        ></p>
                       </div>
                     </div>
                     
                     {/* Actions */}
                     <div className="flex md:flex-col gap-2 justify-end md:min-w-[140px]">
                       <button
-                        onClick={() => setChatPaper(paper)}
-                        className="w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg"
+                        onClick={() => handleChatClick(paper)}
+                        disabled={isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title)}
+                        className="w-full py-2 px-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg disabled:opacity-50"
                         style={{ marginBottom: 8 }}
                       >
-                        💬 Chat
+                        {isChatLoading && chatLoadingPaper === (paper.pdfUrl || paper.title) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            💬 Chat
+                          </>
+                        )}
                       </button>
                       <button 
                         onClick={() => processQuery(paper.pdfUrl, paper.pdfUrl, paper)}
