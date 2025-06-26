@@ -14,6 +14,7 @@ import {
 import DiscordCanary from '../assets/Discord_Canary.png';
 // @ts-ignore
 import PaperRAGChatModal from "./PaperRAGChatModal.jsx";
+import DiscordButton from './common/DiscordButton';
 
 interface PaperResult {
   title: string;
@@ -536,7 +537,11 @@ export default function Dashboard() {
   }, [previewUrl]);
 
   return (
-    <div className="min-h-screen">      <header className="bg-glass sticky top-0 z-10 border-b border-white/30 shadow-soft">
+    <div className="min-h-screen">
+      {/* Discord Button - Fixed Position */}
+      <DiscordButton />
+
+      <header className="bg-glass sticky top-0 z-10 border-b border-white/30 shadow-soft">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
